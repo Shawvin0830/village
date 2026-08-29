@@ -1,4 +1,4 @@
-import { View, Text, ScrollView } from '@tarojs/components'
+import { View, Text } from '@tarojs/components'
 import { useState, useEffect } from 'react'
 import Taro, { useRouter } from '@tarojs/taro'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Network } from '@/network'
-import { ClipboardList, ChevronDown, ChevronUp, RefreshCw, Plus, Pencil, Trash2 } from 'lucide-react-taro'
+import { ClipboardList, ChevronDown, ChevronUp, ArrowLeft, Pencil, Trash2 } from 'lucide-react-taro'
 
 interface InterviewScript {
   id: string
@@ -39,7 +39,7 @@ export default function InterviewScriptPage() {
   const topicId = router.params.topicId || ''
 
   const [scripts, setScripts] = useState<InterviewScript[]>([])
-  const [currentScript, setCurrentScript] = useState<InterviewScript | null>(null)
+  const [selectedScriptId, setSelectedScriptId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set())
   const [editing, setEditing] = useState(false)
@@ -63,10 +63,9 @@ export default function InterviewScriptPage() {
       if (res.data?.code === 200 && res.data?.data) {
         const scriptList = res.data.data as InterviewScript[]
         setScripts(scriptList)
-        if (scriptList.length > 0) {
-          setCurrentScript(scriptList[0])
-          setEditTitle(scriptList[0].title || '')
-          setEditQuestions(scriptList[0].selected_questions || [])
+        // Auto-select the latest script
+        if (scriptList.length > 0 && !selectedScriptId) {
+          setSelectedScriptId(scriptList[0].id)
         }
       }
     } catch (error) {
@@ -75,6 +74,8 @@ export default function InterviewScriptPage() {
       setLoading(false)
     }
   }
+
+  const currentScript = scripts.find(s => s.id === selectedScriptId) || null
 
   const toggleQuestion = (index: number) => {
     const newExpanded = new Set(expandedQuestions)
@@ -86,7 +87,7 @@ export default function InterviewScriptPage() {
     setExpandedQuestions(newExpanded)
   }
 
-  const formatDate = (dateStr: string) => {
+  const formatDateTime = (dateStr: string) => {
     const date = new Date(dateStr)
     const month = date.getMonth() + 1
     const day = date.getDate()
@@ -114,345 +115,290 @@ export default function InterviewScriptPage() {
           selected_questions: editQuestions
         }
       })
-      console.log('Save edit response:', res.data)
       if (res.data?.code === 200) {
-        const updated = { ...currentScript, title: editTitle, selected_questions: editQuestions, updated_at: new Date().toISOString() }
-        setCurrentScript(updated)
-        setScripts(scripts.map(s => s.id === updated.id ? updated : s))
-        setEditing(false)
         Taro.showToast({ title: '保存成功', icon: 'success' })
+        setEditing(false)
+        loadScripts()
       }
     } catch (error) {
-      console.error('Save edit error:', error)
+      console.error('Save error:', error)
       Taro.showToast({ title: '保存失败', icon: 'none' })
     }
   }
 
   const deleteScript = async (id: string) => {
+    const res = await Taro.showModal({
+      title: '确认删除',
+      content: '删除后无法恢复，确定要删除吗？'
+    })
+    if (!res.confirm) return
+
     try {
-      const res = await Network.request({
+      const deleteRes = await Network.request({
         url: `/api/interview-scripts/${id}`,
         method: 'DELETE'
       })
-      if (res.data?.code === 200) {
-        setScripts(scripts.filter(s => s.id !== id))
-        if (currentScript?.id === id) {
-          setCurrentScript(null)
-        }
+      if (deleteRes.data?.code === 200) {
         Taro.showToast({ title: '删除成功', icon: 'success' })
+        if (selectedScriptId === id) {
+          setSelectedScriptId(null)
+        }
+        loadScripts()
       }
     } catch (error) {
-      console.error('Delete script error:', error)
+      console.error('Delete error:', error)
       Taro.showToast({ title: '删除失败', icon: 'none' })
     }
   }
 
-  const selectScript = (script: InterviewScript) => {
-    setCurrentScript(script)
-    setEditTitle(script.title || '')
-    setEditQuestions(script.selected_questions || [])
-    setEditing(false)
+  const updateQuestion = (index: number, field: string, value: string) => {
+    const newQuestions = [...editQuestions]
+    newQuestions[index] = { ...newQuestions[index], [field]: value }
+    setEditQuestions(newQuestions)
+  }
+
+  const addQuestion = () => {
+    setEditQuestions([...editQuestions, { question: '', intent: '', follow_up: [] }])
+  }
+
+  const removeQuestion = (index: number) => {
+    setEditQuestions(editQuestions.filter((_, i) => i !== index))
+  }
+
+  const goBack = () => {
+    setSelectedScriptId(null)
+    setExpandedQuestions(new Set())
   }
 
   if (loading) {
     return (
-      <View className="min-h-screen bg-stone-50">
-        <View className="px-4 py-4">
-          <Skeleton className="h-20 w-full rounded-xl mb-4" />
-          <Skeleton className="h-40 w-full rounded-xl mb-4" />
-          <Skeleton className="h-32 w-full rounded-xl" />
+      <View className="min-h-screen bg-stone-50 p-4">
+        <View className="max-w-2xl mx-auto space-y-4">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-48 w-full" />
         </View>
       </View>
     )
   }
 
-  if (scripts.length === 0) {
+  // Detail view - show specific questions
+  if (selectedScriptId && currentScript) {
     return (
-      <View className="min-h-screen bg-stone-50 flex flex-col items-center justify-center px-8">
-        <View className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center mb-4">
-          <ClipboardList size={32} color="#a8a29e" />
+      <View className="min-h-screen bg-stone-50 pb-8">
+        {/* Header */}
+        <View className="bg-white border-b border-stone-200 sticky top-0 z-10">
+          <View className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+            <View className="flex items-center gap-2" onClick={goBack}>
+              <ArrowLeft size={20} color="#78716c" />
+              <Text className="text-sm text-stone-600">返回</Text>
+            </View>
+            <View className="flex items-center gap-2">
+              {!editing ? (
+                <Button variant="ghost" size="sm" onClick={startEdit}>
+                  <Pencil size={16} className="mr-1" color="#78716c" />
+                  <Text className="text-xs text-stone-600">编辑</Text>
+                </Button>
+              ) : (
+                <>
+                  <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
+                    <Text className="text-xs text-stone-600">取消</Text>
+                  </Button>
+                  <Button size="sm" onClick={saveEdit}>
+                    <Text className="text-xs text-white">保存</Text>
+                  </Button>
+                </>
+              )}
+            </View>
+          </View>
         </View>
-        <Text className="block text-lg font-semibold text-stone-700 mb-2">暂无采访稿</Text>
-        <Text className="block text-sm text-stone-500 text-center mb-6">
-          请先在「采访策划」页面选择问题并确认保存
-        </Text>
-        <Button
-          variant="outline"
-          className="border-amber-700 text-amber-700"
-          onClick={() => Taro.navigateBack()}
-        >
-          <Text className="text-sm">返回</Text>
-        </Button>
-      </View>
-    )
-  }
 
-  const selectedQuestions = currentScript?.selected_questions || []
-  const warmupQuestions = currentScript?.warmup_questions || []
-  const closingQuestions = currentScript?.closing_questions || []
+        <View className="max-w-2xl mx-auto p-4">
+          {/* Title */}
+          {!editing ? (
+            <View className="mb-4">
+              <Text className="block text-lg font-semibold text-stone-800">
+                {currentScript.title || '采访稿'}
+              </Text>
+              <Text className="block text-xs text-stone-400 mt-1">
+                {formatDateTime(currentScript.created_at)}
+              </Text>
+            </View>
+          ) : (
+            <View className="mb-4">
+              <Input
+                value={editTitle}
+                onInput={(e) => setEditTitle(e.detail.value)}
+                placeholder="采访稿标题"
+                className="text-lg font-semibold"
+              />
+            </View>
+          )}
 
-  return (
-    <View className="min-h-screen bg-stone-50 pb-8">
-      <ScrollView scrollY className="h-full">
-        <View className="px-4 py-4">
-          {/* 采访稿列表 */}
-          {scripts.length > 1 && (
-            <Card className="border-stone-200 bg-white shadow-sm mb-4">
+          {/* Questions */}
+          {!editing ? (
+            <Card className="border-stone-200 shadow-sm">
               <CardContent className="p-4">
-                <Text className="block text-sm font-semibold text-stone-800 mb-3">
-                  历史版本 ({scripts.length})
+                <Text className="block text-sm font-medium text-stone-700 mb-3">
+                  核心问题 ({currentScript.selected_questions.length})
                 </Text>
-                <View className="flex flex-col gap-2">
-                  {scripts.map((s, index) => (
-                    <View
-                      key={s.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg border ${
-                        currentScript?.id === s.id ? 'border-amber-500 bg-amber-50' : 'border-stone-200 bg-stone-50'
-                      }`}
-                      onClick={() => selectScript(s)}
-                    >
-                      <View className="flex-1">
-                        <Text className="block text-sm font-medium text-stone-800">
-                          {s.title || `采访稿 #${scripts.length - index}`}
-                        </Text>
-                        <Text className="block text-xs text-stone-500">
-                          {formatDate(s.created_at)} · {(s.selected_questions || []).length} 个问题
-                        </Text>
-                      </View>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          deleteScript(s.id)
-                        }}
+                <View className="space-y-3">
+                  {currentScript.selected_questions.map((q, idx) => (
+                    <View key={idx} className="border-b border-stone-100 last:border-0 pb-3 last:pb-0">
+                      <View 
+                        className="flex items-start gap-2"
+                        onClick={() => toggleQuestion(idx)}
                       >
-                        <Trash2 size={14} color="#ef4444" />
-                      </Button>
+                        <Text className="text-sm text-stone-800 flex-1">
+                          {idx + 1}. {q.question}
+                        </Text>
+                        {(q.intent || (q.follow_up && q.follow_up.length > 0)) && (
+                          expandedQuestions.has(idx) ? (
+                            <ChevronUp size={16} color="#a8a29e" />
+                          ) : (
+                            <ChevronDown size={16} color="#a8a29e" />
+                          )
+                        )}
+                      </View>
+                      {expandedQuestions.has(idx) && (
+                        <View className="mt-2 pl-6 space-y-2">
+                          {q.intent && (
+                            <View className="bg-stone-50 rounded-lg p-2">
+                              <Text className="block text-xs text-stone-500">
+                                <Text className="text-stone-600 font-medium">意图：</Text>
+                                {q.intent}
+                              </Text>
+                            </View>
+                          )}
+                          {q.follow_up && q.follow_up.length > 0 && (
+                            <View className="bg-stone-50 rounded-lg p-2">
+                              <Text className="block text-xs text-stone-600 font-medium mb-1">追问：</Text>
+                              {q.follow_up.map((f, fIdx) => (
+                                <Text key={fIdx} className="block text-xs text-stone-500">
+                                  • {f}
+                                </Text>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-stone-200 shadow-sm">
+              <CardContent className="p-4">
+                <View className="flex items-center justify-between mb-3">
+                  <Text className="text-sm font-medium text-stone-700">
+                    核心问题 ({editQuestions.length})
+                  </Text>
+                  <Button variant="ghost" size="sm" onClick={addQuestion}>
+                    <Text className="text-xs text-stone-600">+ 添加</Text>
+                  </Button>
+                </View>
+                <View className="space-y-3">
+                  {editQuestions.map((q, idx) => (
+                    <View key={idx} className="border border-stone-200 rounded-lg p-3">
+                      <View className="flex items-start gap-2 mb-2">
+                        <Text className="text-sm text-stone-600 mt-1">{idx + 1}.</Text>
+                        <Textarea
+                          value={q.question}
+                          onInput={(e) => updateQuestion(idx, 'question', e.detail.value)}
+                          placeholder="输入问题"
+                          className="flex-1 text-sm"
+                          style={{ minHeight: '60px' }}
+                        />
+                        <Button variant="ghost" size="sm" onClick={() => removeQuestion(idx)}>
+                          <Trash2 size={14} color="#ef4444" />
+                        </Button>
+                      </View>
+                      <Input
+                        value={q.intent || ''}
+                        onInput={(e) => updateQuestion(idx, 'intent', e.detail.value)}
+                        placeholder="意图（可选）"
+                        className="text-xs"
+                      />
                     </View>
                   ))}
                 </View>
               </CardContent>
             </Card>
           )}
+        </View>
+      </View>
+    )
+  }
 
-          {/* 当前采访稿 */}
-          {currentScript && !editing && (
-            <>
-              {/* 采访稿信息 */}
-              <Card className="border-amber-200 bg-amber-50 shadow-sm mb-4">
+  // List view - show all scripts
+  return (
+    <View className="min-h-screen bg-stone-50 pb-8">
+      {/* Header */}
+      <View className="bg-white border-b border-stone-200 sticky top-0 z-10">
+        <View className="max-w-2xl mx-auto px-4 py-3">
+          <Text className="block text-base font-semibold text-stone-800">采访稿</Text>
+        </View>
+      </View>
+
+      <View className="max-w-2xl mx-auto p-4">
+        {scripts.length === 0 ? (
+          <Card className="border-stone-200 shadow-sm">
+            <CardContent className="p-8 text-center">
+              <View className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mx-auto mb-3">
+                <ClipboardList size={24} color="#a8a29e" />
+              </View>
+              <Text className="block text-sm text-stone-600 mb-1">暂无采访稿</Text>
+              <Text className="block text-xs text-stone-400">
+                在采访策划页选择问题后，采访稿会自动生成
+              </Text>
+            </CardContent>
+          </Card>
+        ) : (
+          <View className="space-y-3">
+            {scripts.map((script, index) => (
+              <Card 
+                key={script.id} 
+                className="border-stone-200 shadow-sm"
+                onClick={() => setSelectedScriptId(script.id)}
+              >
                 <CardContent className="p-4">
-                  <View className="flex items-center gap-3 mb-3">
-                    <View className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                      <ClipboardList size={20} color="#B45309" />
-                    </View>
+                  <View className="flex items-start justify-between">
                     <View className="flex-1">
-                      <Text className="block text-base font-semibold text-stone-800">
-                        {currentScript.title || '采访稿'}
-                      </Text>
-                      <Text className="block text-xs text-stone-500">
-                        创建于 {formatDate(currentScript.created_at)}
-                      </Text>
+                      <View className="flex items-center gap-2 mb-1">
+                        <Text className="text-sm font-medium text-stone-800">
+                          {script.title || '采访稿'}
+                        </Text>
+                        {index === 0 && (
+                          <Badge variant="default" className="text-xs">最新</Badge>
+                        )}
+                      </View>
+                      <View className="flex items-center gap-3">
+                        <Text className="text-xs text-stone-400">
+                          {formatDateTime(script.created_at)}
+                        </Text>
+                        <Text className="text-xs text-stone-400">
+                          {script.selected_questions.length} 个问题
+                        </Text>
+                      </View>
                     </View>
-                    <Button
-                      variant="ghost"
+                    <Button 
+                      variant="ghost" 
                       size="sm"
-                      onClick={startEdit}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        deleteScript(script.id)
+                      }}
                     >
-                      <Pencil size={16} color="#78716c" />
+                      <Trash2 size={14} color="#ef4444" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={loadScripts}
-                    >
-                      <RefreshCw size={16} color="#78716c" />
-                    </Button>
-                  </View>
-                  <View className="flex flex-wrap gap-2">
-                    <Badge variant="secondary" className="bg-amber-100 text-amber-800">
-                      核心问题 {selectedQuestions.length}
-                    </Badge>
-                    {warmupQuestions.length > 0 && (
-                      <Badge variant="secondary" className="bg-green-100 text-green-800">
-                        暖场 {warmupQuestions.length}
-                      </Badge>
-                    )}
-                    {closingQuestions.length > 0 && (
-                      <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                        收尾 {closingQuestions.length}
-                      </Badge>
-                    )}
                   </View>
                 </CardContent>
               </Card>
-
-              {/* 暖场问题 */}
-              {warmupQuestions.length > 0 && (
-                <Card className="border-green-200 bg-green-50 shadow-sm mb-4">
-                  <CardContent className="p-4">
-                    <Text className="block text-sm font-semibold text-green-800 mb-3">
-                      暖场问题
-                    </Text>
-                    {warmupQuestions.map((q, index) => (
-                      <View key={`warmup-${index}`} className="mb-2 last:mb-0">
-                        <Text className="block text-sm text-stone-700">
-                          {index + 1}. {q.question}
-                        </Text>
-                      </View>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* 核心问题 */}
-              {selectedQuestions.length > 0 && (
-                <Card className="border-stone-200 bg-white shadow-sm mb-4">
-                  <CardContent className="p-4">
-                    <Text className="block text-sm font-semibold text-stone-800 mb-3">
-                      核心问题
-                    </Text>
-                    {selectedQuestions.map((q, index) => (
-                      <View key={`core-${index}`} className="mb-3 last:mb-0">
-                        <View
-                          className="flex items-start gap-2"
-                          onClick={() => toggleQuestion(index)}
-                        >
-                          <Text className="flex-1 text-sm text-stone-800">
-                            {index + 1}. {q.question}
-                          </Text>
-                          {(q.intent || (q.follow_up && q.follow_up.length > 0)) && (
-                            expandedQuestions.has(index) ? (
-                              <ChevronUp size={16} color="#78716c" />
-                            ) : (
-                              <ChevronDown size={16} color="#78716c" />
-                            )
-                          )}
-                        </View>
-                        {expandedQuestions.has(index) && (
-                          <View className="mt-2 ml-6 pl-3 border-l-2 border-stone-200">
-                            {q.intent && (
-                              <View className="mb-2">
-                                <Text className="block text-xs font-medium text-stone-600 mb-1">意图</Text>
-                                <Text className="block text-xs text-stone-500">{q.intent}</Text>
-                              </View>
-                            )}
-                            {q.follow_up && q.follow_up.length > 0 && (
-                              <View>
-                                <Text className="block text-xs font-medium text-stone-600 mb-1">追问</Text>
-                                {q.follow_up.map((f, fi) => (
-                                  <Text key={fi} className="block text-xs text-stone-500 mb-1">
-                                    • {f}
-                                  </Text>
-                                ))}
-                              </View>
-                            )}
-                          </View>
-                        )}
-                      </View>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* 收尾问题 */}
-              {closingQuestions.length > 0 && (
-                <Card className="border-blue-200 bg-blue-50 shadow-sm mb-4">
-                  <CardContent className="p-4">
-                    <Text className="block text-sm font-semibold text-blue-800 mb-3">
-                      收尾问题
-                    </Text>
-                    {closingQuestions.map((q, index) => (
-                      <View key={`closing-${index}`} className="mb-2 last:mb-0">
-                        <Text className="block text-sm text-stone-700">
-                          {index + 1}. {q.question}
-                        </Text>
-                      </View>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          )}
-
-          {/* 编辑模式 */}
-          {currentScript && editing && (
-            <Card className="border-amber-200 bg-white shadow-sm mb-4">
-              <CardContent className="p-4">
-                <Text className="block text-sm font-semibold text-stone-800 mb-3">
-                  编辑采访稿
-                </Text>
-                <View className="mb-4">
-                  <Text className="block text-xs text-stone-600 mb-1">标题</Text>
-                  <Input
-                    value={editTitle}
-                    onInput={(e) => setEditTitle(e.detail.value)}
-                    placeholder="采访稿标题"
-                    className="w-full"
-                  />
-                </View>
-                <View className="mb-4">
-                  <Text className="block text-xs text-stone-600 mb-2">核心问题</Text>
-                  {editQuestions.map((q, index) => (
-                    <View key={index} className="mb-3 p-3 bg-stone-50 rounded-lg">
-                      <View className="flex items-start gap-2 mb-2">
-                        <Text className="text-xs text-stone-500 mt-1">{index + 1}.</Text>
-                        <Textarea
-                          value={q.question}
-                          onInput={(e) => {
-                            const newQuestions = [...editQuestions]
-                            newQuestions[index] = { ...newQuestions[index], question: e.detail.value }
-                            setEditQuestions(newQuestions)
-                          }}
-                          placeholder="问题内容"
-                          className="flex-1 min-h-16"
-                        />
-                      </View>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-500"
-                        onClick={() => {
-                          const newQuestions = editQuestions.filter((_, i) => i !== index)
-                          setEditQuestions(newQuestions)
-                        }}
-                      >
-                        <Text className="text-xs text-red-500">删除</Text>
-                      </Button>
-                    </View>
-                  ))}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full border-dashed"
-                    onClick={() => {
-                      setEditQuestions([...editQuestions, { question: '', intent: '', follow_up: [] }])
-                    }}
-                  >
-                    <Plus size={14} color="#78716c" />
-                    <Text className="text-xs text-stone-600 ml-1">添加问题</Text>
-                  </Button>
-                </View>
-                <View className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1 border-stone-300 text-stone-700"
-                    onClick={() => setEditing(false)}
-                  >
-                    <Text className="text-sm">取消</Text>
-                  </Button>
-                  <Button
-                    className="flex-1 bg-amber-700 text-white"
-                    onClick={saveEdit}
-                  >
-                    <Text className="text-sm">保存</Text>
-                  </Button>
-                </View>
-              </CardContent>
-            </Card>
-          )}
-        </View>
-      </ScrollView>
+            ))}
+          </View>
+        )}
+      </View>
     </View>
   )
 }
