@@ -1,19 +1,9 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Headers, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, HttpCode } from '@nestjs/common';
 import { TopicsService } from './topics.service';
-import { OperatorsService } from '@/operators/operators.service';
 
 @Controller('topics')
 export class TopicsController {
-  constructor(
-    private readonly topicsService: TopicsService,
-    private readonly operatorsService: OperatorsService,
-  ) {}
-
-  private async resolveOperator(headers: any) {
-    const token = headers?.['x-operator-token'];
-    if (!token) return undefined;
-    try { return await this.operatorsService.resolve(token) ?? undefined; } catch { return undefined; }
-  }
+  constructor(private readonly topicsService: TopicsService) {}
 
   @Get('dashboard')
   @HttpCode(200)
@@ -38,9 +28,8 @@ export class TopicsController {
 
   @Post()
   @HttpCode(200)
-  async create(@Body() body: { name: string; description?: string }, @Headers() headers: any) {
-    const operator = await this.resolveOperator(headers);
-    const data = await this.topicsService.create(body.name, body.description, operator);
+  async create(@Body() body: { name: string; description?: string }) {
+    const data = await this.topicsService.create(body.name, body.description);
     return { code: 200, msg: 'success', data };
   }
 
@@ -63,10 +52,8 @@ export class TopicsController {
   async createSubtopic(
     @Param('id') id: string,
     @Body() body: { name: string; icon?: string },
-    @Headers() headers: any,
   ) {
-    const operator = await this.resolveOperator(headers);
-    const data = await this.topicsService.createSubtopic(id, body.name, body.icon, operator);
+    const data = await this.topicsService.createSubtopic(id, body.name, body.icon);
     return { code: 200, msg: 'success', data };
   }
 

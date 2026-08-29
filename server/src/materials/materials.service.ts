@@ -1,16 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { getSupabaseClient } from '@/storage/database/supabase-client'
 import { MaterialEmbeddingSkill } from '@/skills/material-embedding.skill'
-import { OperatorsService, OperatorContext } from '@/operators/operators.service'
 
 @Injectable()
 export class MaterialsService {
   private readonly logger = new Logger(MaterialsService.name)
 
-  constructor(
-    private readonly embeddingSkill: MaterialEmbeddingSkill,
-    private readonly operatorsService: OperatorsService,
-  ) {}
+  constructor(private readonly embeddingSkill: MaterialEmbeddingSkill) {}
 
   private get client() {
     return getSupabaseClient()
@@ -252,26 +248,19 @@ export class MaterialsService {
     url?: string
     structuredData?: Record<string, unknown>
     tags?: string[]
-  }, operator?: OperatorContext) {
-    const insertData: Record<string, unknown> = {
-      topic_id: data.topicId,
-      subtopic_id: data.subtopicId || null,
-      source: data.source || 'manual',
-      title: data.title,
-      content: data.content,
-      url: data.url || null,
-      structured_data: data.structuredData || null,
-      tags: data.tags || null,
-    }
-    if (operator) {
-      insertData.created_by = operator.id
-      insertData.created_by_name = operator.displayName
-      insertData.updated_by = operator.id
-      insertData.updated_by_name = operator.displayName
-    }
+  }) {
     const { data: material, error } = await this.client
       .from('reference_materials')
-      .insert(insertData)
+      .insert({
+        topic_id: data.topicId,
+        subtopic_id: data.subtopicId || null,
+        source: data.source || 'manual',
+        title: data.title,
+        content: data.content,
+        url: data.url || null,
+        structured_data: data.structuredData || null,
+        tags: data.tags || null,
+      })
       .select()
       .single()
 
@@ -299,13 +288,9 @@ export class MaterialsService {
     url?: string
     structuredData?: Record<string, unknown>
     tags?: string[]
-  }, operator?: OperatorContext) {
+  }) {
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
-    }
-    if (operator) {
-      updateData.updated_by = operator.id
-      updateData.updated_by_name = operator.displayName
     }
 
     if (data.title !== undefined) updateData.title = data.title
