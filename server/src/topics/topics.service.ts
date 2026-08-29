@@ -93,7 +93,6 @@ export class TopicsService {
     topicId: string,
     subtopicId: string,
     authLevel: string,
-    authMethod?: string,
     authPerson?: string,
     restriction?: string,
   ) {
@@ -101,7 +100,6 @@ export class TopicsService {
       topicId,
       subtopicId,
       authLevel,
-      authMethod,
       authPerson,
       restriction,
     );
@@ -112,8 +110,10 @@ export class TopicsService {
     intervieweeId: string,
     payload: {
       name?: string;
+      age?: string;
+      occupation?: string;
+      role?: string;
       authStatus: string;
-      authMethod?: string;
       authNote?: string;
       topicAffiliations?: Array<{ primary: string; secondary: string }>;
     },

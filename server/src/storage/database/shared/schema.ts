@@ -37,10 +37,7 @@ export const interviewPlans = pgTable("interview_plans", {
 	adultQuestions: jsonb("adult_questions"),
 	childQuestions: jsonb("child_questions"),
 	tips: jsonb(),
-	status: varchar({ length: 20 }).default('draft').notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
-	parentId: varchar("parent_id", { length: 36 }),
 }, (table) => [
 	index("interview_plans_topic_id_idx").using("btree", table.topicId.asc().nullsLast().op("text_ops")),
 	foreignKey({
@@ -48,11 +45,6 @@ export const interviewPlans = pgTable("interview_plans", {
 			foreignColumns: [topics.id],
 			name: "interview_plans_topic_id_topics_id_fk"
 		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.parentId],
-			foreignColumns: [table.id],
-			name: "interview_plans_parent_id_interview_plans_id_fk"
-		}).onDelete("set null"),
 ]);
 
 export const interviewRecords = pgTable("interview_records", {
@@ -92,8 +84,7 @@ export const interviewees = pgTable("interviewees", {
 	age: varchar({ length: 30 }),
 	occupation: varchar({ length: 100 }),
 	role: varchar({ length: 100 }),
-	authStatus: varchar("auth_status", { length: 30 }).default('pending').notNull(),
-	authMethod: varchar("auth_method", { length: 50 }),
+	authStatus: varchar("auth_status", { length: 30 }).default('unset').notNull(),
 	authNote: text("auth_note"),
 	topicAffiliations: jsonb("topic_affiliations").default(sql`'[]'::jsonb`).notNull(),
 	confirmedAt: timestamp("confirmed_at", { withTimezone: true, mode: 'string' }),
@@ -139,7 +130,6 @@ export const authorizationRecords = pgTable("authorization_records", {
 	intervieweeId: varchar("interviewee_id", { length: 36 }),
 	subtopicId: varchar("subtopic_id", { length: 36 }),
 	authStatus: varchar("auth_status", { length: 30 }).notNull(),
-	authMethod: varchar("auth_method", { length: 50 }),
 	authPerson: varchar("auth_person", { length: 100 }),
 	restriction: text(),
 	topicAffiliations: jsonb("topic_affiliations").default(sql`'[]'::jsonb`).notNull(),

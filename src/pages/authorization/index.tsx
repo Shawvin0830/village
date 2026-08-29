@@ -10,14 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Network } from "@/network";
 import {
-  Check,
-  CircleAlert,
-  Clock,
+  ArrowLeft,
   FileText,
-  RotateCcw,
+  Plus,
+  Search,
   ShieldCheck,
   Tags,
   UserRound,
+  Users,
 } from "lucide-react-taro";
 
 interface TopicAffiliation {
@@ -31,6 +31,13 @@ interface TaxonomyGroup {
   secondary: string[];
 }
 
+interface InterviewPackage {
+  id: string;
+  title: string;
+  summary: string;
+  created_at?: string | null;
+}
+
 interface IntervieweeCard {
   id: string;
   name: string;
@@ -39,11 +46,10 @@ interface IntervieweeCard {
   role?: string | null;
   auth_status: string;
   auth_status_label: string;
-  auth_method?: string | null;
-  auth_method_label?: string;
   auth_note?: string | null;
   topic_affiliations: TopicAffiliation[];
   suggested_affiliations?: TopicAffiliation[];
+  interview_packages?: InterviewPackage[];
   source_count: number;
   source_summary?: string;
   confirmed_at?: string | null;
@@ -55,22 +61,21 @@ interface AuthListData {
   topic_name: string;
   stats: {
     total: number;
-    pending: number;
+    unset: number;
     agreed: number;
     declined: number;
-    revisit: number;
-    withdrawn: number;
     tagged: number;
   };
   interviewees: IntervieweeCard[];
   taxonomy: TaxonomyGroup[];
-  reminder: string;
 }
 
 interface IntervieweeForm {
   name: string;
+  age: string;
+  occupation: string;
+  role: string;
   authStatus: string;
-  authMethod: string;
   authNote: string;
   affiliations: TopicAffiliation[];
 }
@@ -95,25 +100,13 @@ const DEFAULT_TAXONOMY: TaxonomyGroup[] = [
 ];
 
 const AUTH_STATUS_OPTIONS = [
-  { value: "pending", label: "待确认", color: "bg-stone-100 text-stone-600", icon: Clock },
-  { value: "agreed", label: "已同意", color: "bg-green-50 text-green-700", icon: ShieldCheck },
-  { value: "declined", label: "不同意", color: "bg-red-50 text-red-600", icon: CircleAlert },
-  { value: "revisit", label: "需回访确认", color: "bg-amber-50 text-amber-700", icon: RotateCcw },
-  { value: "withdrawn", label: "已撤回", color: "bg-stone-100 text-stone-500", icon: CircleAlert },
-];
-
-const AUTH_METHOD_OPTIONS = [
-  { value: "verbal", label: "口述确认" },
-  { value: "written", label: "书面确认" },
-  { value: "family_proxy", label: "家属代确认" },
-  { value: "other", label: "其他方式" },
+  { value: "unset", label: "未设置", color: "bg-stone-100 text-stone-600" },
+  { value: "agreed", label: "同意", color: "bg-green-50 text-green-700" },
+  { value: "declined", label: "不同意", color: "bg-red-50 text-red-600" },
 ];
 
 const statusInfo = (status: string) =>
   AUTH_STATUS_OPTIONS.find((item) => item.value === status) || AUTH_STATUS_OPTIONS[0];
-
-const methodLabel = (method?: string | null) =>
-  AUTH_METHOD_OPTIONS.find((item) => item.value === method)?.label || "待补充";
 
 const affiliationKey = (item: TopicAffiliation) => `${item.primary}::${item.secondary}`;
 
@@ -126,8 +119,29 @@ const toggleAffiliation = (items: TopicAffiliation[], target: TopicAffiliation) 
     : [...items, target];
 
 const affiliationText = (items: TopicAffiliation[]) => {
-  if (items.length === 0) return "待标注";
+  if (items.length === 0) return "未标注";
   return items.map((item) => item.secondary).join("、");
+};
+
+const personMatchesQuery = (person: IntervieweeCard, query: string) => {
+  const normalized = query.trim();
+  if (!normalized) return true;
+  const affiliations = [
+    ...(person.topic_affiliations || []),
+    ...(person.suggested_affiliations || []),
+  ];
+  const text = [
+    person.name,
+    person.age,
+    person.occupation,
+    person.role,
+    person.source_summary,
+    person.auth_note,
+    ...affiliations.map((item) => `${item.primary} ${item.secondary}`),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return text.includes(normalized);
 };
 
 const AuthorizationPage = () => {
@@ -136,9 +150,12 @@ const AuthorizationPage = () => {
 
   const [authData, setAuthData] = useState<AuthListData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<string | null>(null);
-  const [expandedPerson, setExpandedPerson] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [query, setQuery] = useState("");
+  const [listStatus, setListStatus] = useState<string | null>(null);
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [formState, setFormState] = useState<Record<string, IntervieweeForm>>({});
+  const [customInputs, setCustomInputs] = useState<Record<string, string>>({});
 
   const fetchAuthList = useCallback(async () => {
     if (!topicId) return;
@@ -165,8 +182,10 @@ const AuthorizationPage = () => {
     return (
       formState[person.id] || {
         name: person.name || "",
-        authStatus: person.auth_status || "pending",
-        authMethod: person.auth_method || "verbal",
+        age: person.age || "",
+        occupation: person.occupation || "",
+        role: person.role || "",
+        authStatus: person.auth_status || "unset",
         authNote: person.auth_note || "",
         affiliations:
           person.topic_affiliations?.length > 0
@@ -188,22 +207,74 @@ const AuthorizationPage = () => {
     }));
   };
 
-  const handleSave = async (person: IntervieweeCard) => {
+  const openProfile = (personId: string) => {
+    setSelectedPersonId(personId);
+    setListStatus(null);
+  };
+
+  const openStatusList = (status: string) => {
+    setListStatus(status);
+    setSelectedPersonId(null);
+  };
+
+  const addInterviewee = () => {
+    if (!authData) return;
+    const id = `temp-manual-${Date.now()}`;
+    const newPerson: IntervieweeCard = {
+      id,
+      name: "新受访人",
+      age: null,
+      occupation: null,
+      role: null,
+      auth_status: "unset",
+      auth_status_label: "未设置",
+      auth_note: null,
+      topic_affiliations: [],
+      suggested_affiliations: [],
+      interview_packages: [],
+      source_count: 0,
+      source_summary: "",
+      confirmed_at: null,
+      is_temporary: true,
+    };
+    setAuthData({
+      ...authData,
+      stats: { ...authData.stats, total: authData.stats.total + 1, unset: authData.stats.unset + 1 },
+      interviewees: [...authData.interviewees, newPerson],
+    });
+    setFormState((current) => ({
+      ...current,
+      [id]: {
+        name: "",
+        age: "",
+        occupation: "",
+        role: "",
+        authStatus: "unset",
+        authNote: "",
+        affiliations: [],
+      },
+    }));
+    openProfile(id);
+  };
+
+  const savePerson = async (person: IntervieweeCard) => {
     const form = getForm(person);
     if (!form.name.trim()) {
-      Taro.showToast({ title: "请填写受访人姓名", icon: "none" });
+      Taro.showToast({ title: "请填写姓名", icon: "none" });
       return;
     }
 
     try {
-      setSaving(person.id);
+      setSaving(true);
       const res = await Network.request({
         url: `/api/topics/${topicId}/interviewees/${person.id}/authorization`,
         method: "POST",
         data: {
           name: form.name.trim(),
+          age: form.age.trim(),
+          occupation: form.occupation.trim(),
+          role: form.role.trim(),
           auth_status: form.authStatus,
-          auth_method: form.authMethod,
           auth_note: form.authNote.trim(),
           topic_affiliations: form.affiliations,
         },
@@ -211,105 +282,41 @@ const AuthorizationPage = () => {
 
       if (res.data?.data) {
         Taro.showToast({ title: "已保存", icon: "success" });
-        setExpandedPerson(res.data.data.next_interviewee_id || null);
-        fetchAuthList();
+        await fetchAuthList();
+        setSelectedPersonId(res.data.data.id || person.id);
       }
     } catch (err) {
-      console.error("保存授权状态失败:", err);
+      console.error("保存受访人失败:", err);
       Taro.showToast({ title: "保存失败，请重试", icon: "none" });
     } finally {
-      setSaving(null);
+      setSaving(false);
     }
   };
 
-  const renderStatusPicker = (person: IntervieweeCard) => {
+  const addCustomSecondary = (person: IntervieweeCard, group: TaxonomyGroup) => {
+    const inputKey = `${person.id}-${group.primary}`;
+    const value = (customInputs[inputKey] || "").trim();
+    if (!value) {
+      Taro.showToast({ title: "请输入话题名", icon: "none" });
+      return;
+    }
     const form = getForm(person);
-    return (
-      <View className="grid grid-cols-2 gap-2">
-        {AUTH_STATUS_OPTIONS.map((option) => {
-          const selected = form.authStatus === option.value;
-          return (
-            <Button
-              key={option.value}
-              size="sm"
-              variant={selected ? "default" : "outline"}
-              className="justify-start"
-              onClick={() => updateForm(person.id, { authStatus: option.value })}
-            >
-              <Text>{selected ? "✓ " : ""}{option.label}</Text>
-            </Button>
-          );
-        })}
-      </View>
-    );
-  };
-
-  const renderMethodPicker = (person: IntervieweeCard) => {
-    const form = getForm(person);
-    return (
-      <View className="flex flex-wrap gap-2">
-        {AUTH_METHOD_OPTIONS.map((option) => (
-          <Button
-            key={option.value}
-            size="sm"
-            variant={form.authMethod === option.value ? "default" : "outline"}
-            onClick={() => updateForm(person.id, { authMethod: option.value })}
-          >
-            <Text>{option.label}</Text>
-          </Button>
-        ))}
-      </View>
-    );
-  };
-
-  const renderAffiliationPicker = (person: IntervieweeCard, taxonomy: TaxonomyGroup[]) => {
-    const form = getForm(person);
-    return (
-      <View className="space-y-3">
-        {taxonomy.map((group) => (
-          <View key={group.code} className="bg-stone-50 rounded-lg p-3">
-            <Text className="block text-xs font-semibold text-stone-700 mb-2">
-              {group.code} {group.primary}
-            </Text>
-            <View className="flex flex-wrap gap-2">
-              {group.secondary.map((secondary) => {
-                const affiliation = { primary: group.primary, secondary };
-                const selected = hasAffiliation(form.affiliations, affiliation);
-                return (
-                  <Button
-                    key={`${group.primary}-${secondary}`}
-                    size="sm"
-                    variant={selected ? "default" : "outline"}
-                    onClick={() =>
-                      updateForm(person.id, {
-                        affiliations: toggleAffiliation(form.affiliations, affiliation),
-                      })
-                    }
-                  >
-                    <Text>{secondary}</Text>
-                  </Button>
-                );
-              })}
-            </View>
-          </View>
-        ))}
-      </View>
-    );
+    updateForm(person.id, {
+      affiliations: toggleAffiliation(form.affiliations, {
+        primary: group.primary,
+        secondary: value,
+      }),
+    });
+    setCustomInputs((current) => ({ ...current, [inputKey]: "" }));
   };
 
   if (loading) {
     return (
       <View className="min-h-screen bg-background p-4">
         <Skeleton className="h-8 w-48 mb-4" />
-        {[1, 2, 3].map((i) => (
-          <Card key={i} className="mb-3">
-            <CardContent className="p-4">
-              <Skeleton className="h-6 w-32 mb-2" />
-              <Skeleton className="h-4 w-full mb-2" />
-              <Skeleton className="h-10 w-full" />
-            </CardContent>
-          </Card>
-        ))}
+        <Skeleton className="h-12 w-full mb-3" />
+        <Skeleton className="h-20 w-full mb-3" />
+        <Skeleton className="h-20 w-full" />
       </View>
     );
   }
@@ -326,7 +333,362 @@ const AuthorizationPage = () => {
 
   const taxonomy = authData.taxonomy?.length ? authData.taxonomy : DEFAULT_TAXONOMY;
   const interviewees = authData.interviewees || [];
-  const taggedCount = interviewees.filter((person) => person.topic_affiliations.length > 0).length;
+  const selectedPerson = interviewees.find((item) => item.id === selectedPersonId) || null;
+  const searchResults = query.trim()
+    ? interviewees.filter((person) => personMatchesQuery(person, query))
+    : [];
+  const statusList = listStatus
+    ? interviewees.filter((person) => person.auth_status === listStatus)
+    : [];
+
+  const renderPersonRow = (person: IntervieweeCard) => {
+    const info = statusInfo(person.auth_status);
+    return (
+      <View
+        key={person.id}
+        className="flex items-center justify-between py-3 border-b border-stone-100 last:border-0"
+        onClick={() => openProfile(person.id)}
+      >
+        <View className="flex items-center flex-1">
+          <View className="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center mr-3">
+            <UserRound size={18} color="#92400E" />
+          </View>
+          <View className="flex-1">
+            <View className="flex items-center">
+              <Text className="block text-sm font-semibold text-foreground mr-2">
+                {person.name}
+              </Text>
+              {person.is_temporary && (
+                <Badge variant="outline">
+                  <Text className="text-xs">待建档</Text>
+                </Badge>
+              )}
+            </View>
+            <Text className="block text-xs text-muted-foreground mt-1">
+              {affiliationText(person.topic_affiliations)}
+            </Text>
+          </View>
+        </View>
+        <Badge className={info.color}>
+          <Text className="text-xs">{info.label}</Text>
+        </Badge>
+      </View>
+    );
+  };
+
+  const renderListView = (title: string, people: IntervieweeCard[]) => (
+    <View className="px-4 -mt-3">
+      <Card>
+        <CardContent className="p-4">
+          <View className="flex items-center mb-3">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="mr-2"
+              onClick={() => {
+                setListStatus(null);
+                setSelectedPersonId(null);
+              }}
+            >
+              <ArrowLeft size={16} color="#57534E" />
+            </Button>
+            <Text className="block text-base font-semibold text-foreground">{title}</Text>
+          </View>
+          {people.length > 0 ? (
+            <View>{people.map(renderPersonRow)}</View>
+          ) : (
+            <Text className="block text-sm text-muted-foreground text-center py-6">
+              暂无名单
+            </Text>
+          )}
+        </CardContent>
+      </Card>
+    </View>
+  );
+
+  const renderProfile = (person: IntervieweeCard) => {
+    const form = getForm(person);
+    const packages = person.interview_packages || [];
+
+    return (
+      <View className="px-4 -mt-3">
+        <Card>
+          <CardContent className="p-4">
+            <View className="flex items-center justify-between mb-4">
+              <View className="flex items-center">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="mr-2"
+                  onClick={() => setSelectedPersonId(null)}
+                >
+                  <ArrowLeft size={16} color="#57534E" />
+                </Button>
+                <Text className="block text-base font-semibold text-foreground">
+                  受访人档案
+                </Text>
+              </View>
+              <Badge className={statusInfo(form.authStatus).color}>
+                <Text className="text-xs">{statusInfo(form.authStatus).label}</Text>
+              </Badge>
+            </View>
+
+            <View className="space-y-4">
+              <View>
+                <Text className="block text-xs font-medium text-stone-700 mb-2">姓名</Text>
+                <Input
+                  value={form.name}
+                  placeholder="例如：陈爷爷"
+                  onInput={(event) =>
+                    updateForm(person.id, { name: String(event.detail.value || "") })
+                  }
+                />
+              </View>
+
+              <View className="grid grid-cols-2 gap-3">
+                <View>
+                  <Text className="block text-xs font-medium text-stone-700 mb-2">年龄</Text>
+                  <Input
+                    value={form.age}
+                    placeholder="例如：72"
+                    onInput={(event) =>
+                      updateForm(person.id, { age: String(event.detail.value || "") })
+                    }
+                  />
+                </View>
+                <View>
+                  <Text className="block text-xs font-medium text-stone-700 mb-2">职业</Text>
+                  <Input
+                    value={form.occupation}
+                    placeholder="例如：木匠"
+                    onInput={(event) =>
+                      updateForm(person.id, { occupation: String(event.detail.value || "") })
+                    }
+                  />
+                </View>
+              </View>
+
+              <View>
+                <Text className="block text-xs font-medium text-stone-700 mb-2">身份</Text>
+                <Input
+                  value={form.role}
+                  placeholder="例如：村中老人"
+                  onInput={(event) =>
+                    updateForm(person.id, { role: String(event.detail.value || "") })
+                  }
+                />
+              </View>
+
+              <View>
+                <Text className="block text-xs font-medium text-stone-700 mb-2">授权状态</Text>
+                <View className="grid grid-cols-3 gap-2">
+                  {AUTH_STATUS_OPTIONS.map((option) => (
+                    <Button
+                      key={option.value}
+                      size="sm"
+                      variant={form.authStatus === option.value ? "default" : "outline"}
+                      onClick={() => updateForm(person.id, { authStatus: option.value })}
+                    >
+                      <Text>{option.label}</Text>
+                    </Button>
+                  ))}
+                </View>
+              </View>
+
+              <View>
+                <Text className="block text-xs font-medium text-stone-700 mb-2">话题归属</Text>
+                {form.affiliations.length > 0 && (
+                  <View className="flex flex-wrap gap-2 mb-3">
+                    {form.affiliations.map((item) => (
+                      <Badge key={affiliationKey(item)} variant="secondary">
+                        <Text className="text-xs">{item.secondary}</Text>
+                      </Badge>
+                    ))}
+                  </View>
+                )}
+                <View className="space-y-3">
+                  {taxonomy.map((group) => {
+                    const inputKey = `${person.id}-${group.primary}`;
+                    return (
+                      <View key={group.code} className="bg-stone-50 rounded-lg p-3">
+                        <View className="flex items-center justify-between mb-2">
+                          <Text className="block text-xs font-semibold text-stone-700">
+                            {group.code} {group.primary}
+                          </Text>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-amber-700"
+                            onClick={() => addCustomSecondary(person, group)}
+                          >
+                            <Plus size={14} color="#B45309" className="mr-1" />
+                            <Text>添加</Text>
+                          </Button>
+                        </View>
+                        <View className="flex gap-2 mb-2">
+                          <Input
+                            value={customInputs[inputKey] || ""}
+                            placeholder="自定义话题"
+                            onInput={(event) =>
+                              setCustomInputs((current) => ({
+                                ...current,
+                                [inputKey]: String(event.detail.value || ""),
+                              }))
+                            }
+                          />
+                        </View>
+                        <View className="flex flex-wrap gap-2">
+                          {group.secondary.map((secondary) => {
+                            const affiliation = { primary: group.primary, secondary };
+                            const selected = hasAffiliation(form.affiliations, affiliation);
+                            return (
+                              <Button
+                                key={`${group.primary}-${secondary}`}
+                                size="sm"
+                                variant={selected ? "default" : "outline"}
+                                onClick={() =>
+                                  updateForm(person.id, {
+                                    affiliations: toggleAffiliation(form.affiliations, affiliation),
+                                  })
+                                }
+                              >
+                                <Text>{secondary}</Text>
+                              </Button>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View>
+                <Text className="block text-xs font-medium text-stone-700 mb-2">特殊要求</Text>
+                <Textarea
+                  value={form.authNote}
+                  placeholder="例如：公开时不要写家人的真实姓名。"
+                  className="h-24"
+                  onInput={(event) =>
+                    updateForm(person.id, { authNote: String(event.detail.value || "") })
+                  }
+                />
+              </View>
+
+              {packages.length > 0 && (
+                <View>
+                  <Separator className="my-2" />
+                  <Text className="block text-xs font-medium text-stone-700 mb-2">
+                    关联采访
+                  </Text>
+                  <View className="space-y-2">
+                    {packages.map((item) => (
+                      <View key={item.id} className="bg-stone-50 rounded-lg p-3">
+                        <View className="flex items-center mb-1">
+                          <FileText size={14} color="#78716C" className="mr-1" />
+                          <Text className="text-xs font-medium text-stone-700">
+                            {item.title}
+                          </Text>
+                        </View>
+                        <Text className="block text-xs text-muted-foreground leading-relaxed">
+                          {item.summary}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              <Button
+                className="w-full bg-amber-700 text-white"
+                disabled={saving}
+                onClick={() => savePerson(person)}
+              >
+                <Text>{saving ? "保存中..." : "保存档案"}</Text>
+              </Button>
+            </View>
+          </CardContent>
+        </Card>
+      </View>
+    );
+  };
+
+  const renderHome = () => (
+    <View className="px-4 -mt-3">
+      <Card className="mb-4">
+        <CardContent className="p-3">
+          <View className="flex items-center">
+            <Search size={16} color="#78716C" className="mr-2" />
+            <Input
+              value={query}
+              placeholder="搜索人名、一级主题或二级话题"
+              onInput={(event) => setQuery(String(event.detail.value || ""))}
+            />
+          </View>
+        </CardContent>
+      </Card>
+
+      {query.trim() && (
+        <Card className="mb-4">
+          <CardContent className="p-4">
+            <Text className="block text-sm font-semibold text-foreground mb-2">
+              搜索结果
+            </Text>
+            {searchResults.length > 0 ? (
+              searchResults.map(renderPersonRow)
+            ) : (
+              <Text className="block text-sm text-muted-foreground text-center py-4">
+                没有找到相关受访人
+              </Text>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <View className="grid grid-cols-3 gap-2 mb-4">
+        {AUTH_STATUS_OPTIONS.map((option) => {
+          const count = authData.stats[option.value as keyof typeof authData.stats] || 0;
+          return (
+            <Card key={option.value} onClick={() => openStatusList(option.value)}>
+              <CardContent className="p-3">
+                <Text className="block text-lg font-bold text-stone-800">{count}</Text>
+                <Text className="block text-xs text-muted-foreground">{option.label}</Text>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </View>
+
+      <View className="grid grid-cols-2 gap-3 mb-4">
+        <Button
+          variant="outline"
+          className="h-auto py-4 bg-white"
+          onClick={() => openStatusList("all")}
+        >
+          <Users size={18} color="#92400E" className="mr-2" />
+          <Text>受访人名单</Text>
+        </Button>
+        <Button className="h-auto py-4 bg-amber-700 text-white" onClick={addInterviewee}>
+          <Plus size={18} color="#FFFFFF" className="mr-2" />
+          <Text>增加受访人</Text>
+        </Button>
+      </View>
+
+      <Card className="border-amber-200 bg-amber-50">
+        <CardContent className="p-4">
+          <View className="flex items-center mb-2">
+            <Tags size={16} color="#92400E" className="mr-2" />
+            <Text className="block text-sm font-semibold text-amber-900">
+              话题归属
+            </Text>
+          </View>
+          <Text className="block text-sm text-amber-800">
+            已标注 {authData.stats.tagged}/{authData.stats.total} 人
+          </Text>
+        </CardContent>
+      </Card>
+    </View>
+  );
 
   return (
     <View className="min-h-screen bg-background pb-8">
@@ -340,243 +702,22 @@ const AuthorizationPage = () => {
         </Text>
         <View className="flex items-center justify-between">
           <Text className="block text-amber-100 text-xs">
-            已同意 {authData.stats.agreed}/{authData.stats.total} 人
+            受访人 {authData.stats.total} 人
           </Text>
           <Text className="block text-amber-100 text-xs">
-            已标注 {taggedCount}/{authData.stats.total} 人
+            同意 {authData.stats.agreed} / 不同意 {authData.stats.declined}
           </Text>
         </View>
       </View>
 
-      <View className="px-4 -mt-3">
-        <Card className="mb-4 border-amber-200 bg-amber-50">
-          <CardContent className="p-3">
-            <Text className="block text-sm font-semibold text-amber-900 mb-1">
-              先看人，再看话题归属
-            </Text>
-            <Text className="block text-xs text-amber-800 leading-relaxed">
-              {authData.reminder || "授权管理以受访人为主：先确认人的授权状态，再标注这个人关联的一、二级话题。"}
-            </Text>
-          </CardContent>
-        </Card>
-
-        <View className="grid grid-cols-2 gap-2 mb-4">
-          <Card>
-            <CardContent className="p-3">
-              <Text className="block text-lg font-bold text-stone-800">
-                {authData.stats.pending + authData.stats.revisit}
-              </Text>
-              <Text className="block text-xs text-muted-foreground">待确认/回访</Text>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3">
-              <Text className="block text-lg font-bold text-stone-800">
-                {authData.stats.declined + authData.stats.withdrawn}
-              </Text>
-              <Text className="block text-xs text-muted-foreground">不同意/已撤回</Text>
-            </CardContent>
-          </Card>
-        </View>
-
-        {interviewees.length === 0 ? (
-          <Card>
-            <CardContent className="p-6">
-              <Text className="block text-sm text-muted-foreground text-center">
-                还没有受访人记录。采访内容整理完成后，会从整理文档里推导候选受访人；也可以后续新增受访人表。
-              </Text>
-            </CardContent>
-          </Card>
-        ) : (
-          <View className="space-y-3">
-            {interviewees.map((person) => {
-              const expanded = expandedPerson === person.id;
-              const form = getForm(person);
-              const info = statusInfo(form.authStatus);
-              const StatusIcon = info.icon;
-              const savedAffiliations = person.topic_affiliations || [];
-              const suggestions = person.suggested_affiliations || [];
-
-              return (
-                <Card key={person.id}>
-                  <CardContent className="p-4">
-                    <View
-                      className="flex items-start justify-between"
-                      onClick={() => setExpandedPerson(expanded ? null : person.id)}
-                    >
-                      <View className="flex items-start flex-1">
-                        <View className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center mr-3">
-                          <UserRound size={20} color="#92400E" />
-                        </View>
-                        <View className="flex-1">
-                          <View className="flex items-center mb-1">
-                            <Text className="block text-base font-semibold text-foreground mr-2">
-                              {person.name}
-                            </Text>
-                            {person.is_temporary && (
-                              <Badge variant="outline">
-                                <Text className="text-xs">待建档</Text>
-                              </Badge>
-                            )}
-                          </View>
-                          <Text className="block text-xs text-muted-foreground">
-                            {(person.age || "年龄待补充") +
-                              " / " +
-                              (person.occupation || person.role || "身份待补充")}
-                          </Text>
-                        </View>
-                      </View>
-                      <Badge className={info.color}>
-                        <View className="flex items-center">
-                          <StatusIcon size={12} color="#57534E" className="mr-1" />
-                          <Text className="text-xs">{info.label}</Text>
-                        </View>
-                      </Badge>
-                    </View>
-
-                    <View className="mt-3 bg-stone-50 rounded-lg p-3">
-                      <View className="flex items-center mb-1">
-                        <Tags size={14} color="#78716C" className="mr-1" />
-                        <Text className="text-xs text-muted-foreground">话题归属</Text>
-                      </View>
-                      <Text className="block text-sm text-stone-700 leading-relaxed">
-                        {affiliationText(savedAffiliations)}
-                      </Text>
-                    </View>
-
-                    {person.source_summary && (
-                      <View className="mt-3 bg-white rounded-lg border border-stone-100 p-3">
-                        <View className="flex items-center mb-1">
-                          <FileText size={14} color="#78716C" className="mr-1" />
-                          <Text className="text-xs text-muted-foreground">
-                            整理文档线索：{person.source_count} 条
-                          </Text>
-                        </View>
-                        <Text className="block text-xs text-stone-600 leading-relaxed">
-                          {person.source_summary}
-                        </Text>
-                      </View>
-                    )}
-
-                    {suggestions.length > 0 && savedAffiliations.length === 0 && (
-                      <View className="mt-3 bg-amber-50 rounded-lg p-3">
-                        <Text className="block text-xs text-amber-800 mb-1">
-                          系统建议标注：
-                        </Text>
-                        <Text className="block text-xs text-amber-800 leading-relaxed">
-                          {affiliationText(suggestions)}
-                        </Text>
-                      </View>
-                    )}
-
-                    <View className="mt-3 flex items-center justify-between">
-                      <Text className="text-xs text-muted-foreground">
-                        授权方式：{methodLabel(person.auth_method)}
-                      </Text>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-amber-700"
-                        onClick={() => setExpandedPerson(expanded ? null : person.id)}
-                      >
-                        <Text>{expanded ? "收起" : "编辑"}</Text>
-                      </Button>
-                    </View>
-
-                    {expanded && (
-                      <View className="mt-4 space-y-4">
-                        <Separator />
-
-                        <View>
-                          <Text className="block text-xs font-medium text-stone-700 mb-2">
-                            受访人姓名
-                          </Text>
-                          <Input
-                            value={form.name}
-                            placeholder="例如：陈爷爷"
-                            onInput={(event) =>
-                              updateForm(person.id, {
-                                name: String(event.detail.value || ""),
-                              })
-                            }
-                          />
-                        </View>
-
-                        <View>
-                          <Text className="block text-xs font-medium text-stone-700 mb-2">
-                            授权状态
-                          </Text>
-                          {renderStatusPicker(person)}
-                        </View>
-
-                        <View>
-                          <Text className="block text-xs font-medium text-stone-700 mb-2">
-                            授权方式
-                          </Text>
-                          {renderMethodPicker(person)}
-                        </View>
-
-                        <View>
-                          <Text className="block text-xs font-medium text-stone-700 mb-2">
-                            话题归属
-                          </Text>
-                          {renderAffiliationPicker(person, taxonomy)}
-                        </View>
-
-                        <View>
-                          <Text className="block text-xs font-medium text-stone-700 mb-2">
-                            特殊要求
-                          </Text>
-                          <Textarea
-                            value={form.authNote}
-                            placeholder="例如：可以用于项目材料；公开时不要写家人的真实姓名。"
-                            className="h-24"
-                            onInput={(event) =>
-                              updateForm(person.id, {
-                                authNote: String(event.detail.value || ""),
-                              })
-                            }
-                          />
-                        </View>
-
-                        <View className="bg-stone-50 rounded-lg p-3">
-                          <View className="flex items-center">
-                            <Check size={14} color="#166534" className="mr-1" />
-                            <Text className="text-xs text-stone-700">
-                              将保存：{form.name || "未命名受访人"} / {statusInfo(form.authStatus).label} / {affiliationText(form.affiliations)}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <Button
-                          className="w-full bg-amber-700 text-white"
-                          disabled={saving === person.id}
-                          onClick={() => handleSave(person)}
-                        >
-                          <Text>{saving === person.id ? "保存中..." : "保存授权状态和话题归属"}</Text>
-                        </Button>
-
-                        {person.confirmed_at && (
-                          <View className="bg-green-50 rounded-lg p-2">
-                            <Text className="block text-xs text-green-800">
-                              最近确认：{person.auth_status_label} / {person.auth_method_label || "方式待补充"}
-                            </Text>
-                            {person.auth_note && (
-                              <Text className="block text-xs text-green-700 mt-1">
-                                特殊要求：{person.auth_note}
-                              </Text>
-                            )}
-                          </View>
-                        )}
-                      </View>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </View>
-        )}
-      </View>
+      {selectedPerson
+        ? renderProfile(selectedPerson)
+        : listStatus
+          ? renderListView(
+              listStatus === "all" ? "受访人名单" : `${statusInfo(listStatus).label}名单`,
+              listStatus === "all" ? interviewees : statusList,
+            )
+          : renderHome()}
     </View>
   );
 };

@@ -57,7 +57,6 @@ export class TopicsController {
     @Param('subId') subId: string,
     @Body() body: {
       auth_level: string;
-      auth_method?: string;
       auth_person?: string;
       restriction?: string;
     },
@@ -66,7 +65,6 @@ export class TopicsController {
       id,
       subId,
       body.auth_level,
-      body.auth_method,
       body.auth_person,
       body.restriction,
     );
@@ -80,8 +78,10 @@ export class TopicsController {
     @Param('intervieweeId') intervieweeId: string,
     @Body() body: {
       name?: string;
+      age?: string;
+      occupation?: string;
+      role?: string;
       auth_status: string;
-      auth_method?: string;
       auth_note?: string;
       topic_affiliations?: Array<{ primary: string; secondary: string }>;
     },
@@ -91,8 +91,10 @@ export class TopicsController {
       intervieweeId,
       {
         name: body.name,
+        age: body.age,
+        occupation: body.occupation,
+        role: body.role,
         authStatus: body.auth_status,
-        authMethod: body.auth_method,
         authNote: body.auth_note,
         topicAffiliations: body.topic_affiliations,
       },
