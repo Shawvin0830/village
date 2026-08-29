@@ -87,6 +87,33 @@ export class VillageResearchSkill {
 
     // 2. 多轮搜索（并行）
     const searchClient = this.getSearchClient();
+
+    interface SearchItem {
+      title: string;
+      url: string;
+      site_name: string;
+      snippet: string;
+      content: string;
+      summary: string;
+      auth_info_des: string;
+      query: string;
+    }
+
+    interface FallbackResult {
+      web_items: Array<{
+        title?: string;
+        url?: string;
+        site_name?: string;
+        snippet?: string;
+        content?: string;
+        summary?: string;
+        auth_info_des?: string;
+      }>;
+      summary: string;
+    }
+
+    const emptyResult: FallbackResult = { web_items: [], summary: '' };
+
     const searchPromises = queries.map((query) =>
       searchClient
         .advancedSearch(query, {
@@ -98,26 +125,20 @@ export class VillageResearchSkill {
         })
         .catch((err) => {
           this.logger.warn(`Search failed for "${query}": ${err.message}`);
-          return { web_items: [], summary: '' };
+          return emptyResult;
         }),
     );
 
     const searchResults = await Promise.all(searchPromises);
 
     // 3. 汇总所有搜索结果
-    const allItems: Array<{
-      title: string;
-      url: string;
-      site_name: string;
-      snippet: string;
-      content: string;
-      summary: string;
-      auth_info_des: string;
-      query: string;
-    }> = [];
+    const allItems: SearchItem[] = [];
     const seenUrls = new Set<string>();
 
-    searchResults.forEach((result, idx) => {
+    const extractItems = (
+      result: FallbackResult,
+      sourceQuery: string,
+    ) => {
       if (result.web_items) {
         result.web_items.forEach((item) => {
           const url = item.url || '';
@@ -131,11 +152,15 @@ export class VillageResearchSkill {
               content: item.content || '',
               summary: item.summary || '',
               auth_info_des: item.auth_info_des || '',
-              query: queries[idx],
+              query: sourceQuery,
             });
           }
         });
       }
+    };
+
+    searchResults.forEach((result, idx) => {
+      extractItems(result as FallbackResult, queries[idx]);
     });
 
     this.logger.log(`Collected ${allItems.length} unique results across ${queries.length} queries`);
@@ -151,26 +176,9 @@ export class VillageResearchSkill {
           needUrl: true,
           needSummary: true,
         })
-        .catch(() => ({ web_items: [], summary: '' }));
+        .catch(() => emptyResult);
 
-      if (supplement.web_items) {
-        supplement.web_items.forEach((item) => {
-          const url = item.url || '';
-          if (url && !seenUrls.has(url)) {
-            seenUrls.add(url);
-            allItems.push({
-              title: item.title || '',
-              url,
-              site_name: item.site_name || '',
-              snippet: item.snippet || '',
-              content: item.content || '',
-              summary: item.summary || '',
-              auth_info_des: item.auth_info_des || '',
-              query: supplementQuery,
-            });
-          }
-        });
-      }
+      extractItems(supplement as FallbackResult, supplementQuery);
     }
 
     if (allItems.length === 0) {
