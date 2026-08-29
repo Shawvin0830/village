@@ -339,7 +339,21 @@ const SubtopicMaterialsPage = () => {
 
                     {/* 结构化文档（摘录精华） */}
                     <View className="mb-3">
-                      <Text className="block text-xs text-stone-500 mb-2">采访摘录</Text>
+                      <View className="flex items-center justify-between mb-2">
+                        <Text className="block text-xs text-stone-500">采访摘录</Text>
+                        <View
+                          className="flex items-center"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            Taro.navigateTo({
+                              url: `/pages/interview-manage/index?topicId=${topicId}&subtopicId=${subtopicId}&subName=${encodeURIComponent(data.subtopic.name)}&editId=${item.id}`,
+                            })
+                          }}
+                        >
+                          <Pencil size={12} color="#B45309" className="mr-1" />
+                          <Text className="text-xs text-amber-700">编辑</Text>
+                        </View>
+                      </View>
                       <View className="bg-amber-50 rounded-lg p-3 border border-amber-100">
                         <Text className="block text-sm text-amber-900 leading-relaxed">
                           &ldquo;{item.quote}&rdquo;
