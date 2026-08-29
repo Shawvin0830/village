@@ -269,7 +269,7 @@ export class TopicsService {
       .from('reference_materials')
       .select('id, title, content, source, url, tags, created_at')
       .eq('topic_id', topicId)
-      .eq('subtopic_id', subtopicId)
+      .or(`subtopic_id.eq.${subtopicId},subtopic_id.is.null`)
       .order('created_at', { ascending: false });
     if (referencesError) throw new Error(`查询外部文献失败: ${referencesError.message}`);
 
