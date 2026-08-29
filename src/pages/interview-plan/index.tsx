@@ -478,6 +478,44 @@ const InterviewPlanPage = () => {
         </Text>
       </View>
 
+      {/* 生成按钮（未生成时显示在顶部） */}
+      {!plan && !loading && (
+        <View className="px-4 mb-4">
+          <Card className="border-stone-100 bg-white">
+            <CardContent className="p-6 flex flex-col items-center">
+              <Text className="block text-4xl mb-4">📋</Text>
+              <Text className="block text-base text-stone-700 mb-2 text-center">
+                准备好采访问题
+              </Text>
+              <Text className="block text-sm text-stone-500 mb-6 text-center">
+                AI 会根据话题背景和资料库，生成大人版和孩子版的采访问题
+              </Text>
+              <Button
+                className="bg-amber-700 hover:bg-amber-800 text-white"
+                onClick={handleGenerate}
+                disabled={generating}
+              >
+                <Text>{generating ? 'AI 正在思考...' : '生成采访问题'}</Text>
+              </Button>
+            </CardContent>
+          </Card>
+        </View>
+      )}
+
+      {/* 加载中 */}
+      {loading && (
+        <View className="px-4 mb-4">
+          <View className="flex flex-col items-center py-8">
+            <Text className="block text-4xl mb-4">🤔</Text>
+            <Text className="block text-base text-stone-700 mb-2">AI 正在思考中...</Text>
+            <Text className="block text-sm text-stone-500 mb-6">正在分析话题背景和资料，生成问题清单</Text>
+            <Skeleton className="h-4 w-64 mb-2" />
+            <Skeleton className="h-4 w-48 mb-2" />
+            <Skeleton className="h-4 w-56" />
+          </View>
+        </View>
+      )}
+
       {/* 资料库 */}
       <View className="px-4 mb-4">
         <Card className="border-stone-100 bg-white">
@@ -923,44 +961,6 @@ const InterviewPlanPage = () => {
           </CardContent>
         </Card>
       </View>
-
-      {/* 生成按钮 */}
-      {!plan && !loading && (
-        <View className="px-4 mb-6">
-          <Card className="border-stone-100 bg-white">
-            <CardContent className="p-6 flex flex-col items-center">
-              <Text className="block text-4xl mb-4">📋</Text>
-              <Text className="block text-base text-stone-700 mb-2 text-center">
-                准备好采访问题
-              </Text>
-              <Text className="block text-sm text-stone-500 mb-6 text-center">
-                AI 会根据话题背景和资料库，生成大人版和孩子版的采访问题
-              </Text>
-              <Button
-                className="bg-amber-700 hover:bg-amber-800 text-white"
-                onClick={handleGenerate}
-                disabled={generating}
-              >
-                <Text>{generating ? 'AI 正在思考...' : '生成采访问题'}</Text>
-              </Button>
-            </CardContent>
-          </Card>
-        </View>
-      )}
-
-      {/* 加载中 */}
-      {loading && (
-        <View className="px-4">
-          <View className="flex flex-col items-center py-8">
-            <Text className="block text-4xl mb-4">🤔</Text>
-            <Text className="block text-base text-stone-700 mb-2">AI 正在思考中...</Text>
-            <Text className="block text-sm text-stone-500 mb-6">正在分析话题背景和资料，生成问题清单</Text>
-            <Skeleton className="h-4 w-64 mb-2" />
-            <Skeleton className="h-4 w-48 mb-2" />
-            <Skeleton className="h-4 w-56" />
-          </View>
-        </View>
-      )}
 
       {/* 策划结果 */}
       {plan && (
