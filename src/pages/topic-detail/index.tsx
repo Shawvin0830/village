@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Network } from '@/network'
-import { Plus, BookOpen, Mic, ShieldCheck, Trash2, ChevronRight, Pencil } from 'lucide-react-taro'
+import { Plus, BookOpen, Mic, ShieldCheck, Trash2, ChevronRight } from 'lucide-react-taro'
 
 interface Subtopic {
   id: string
@@ -115,12 +115,6 @@ const TopicDetailPage = () => {
 
   const goToSubtopicMaterials = (subId: string) => {
     Taro.navigateTo({ url: `/pages/subtopic-materials/index?topicId=${topicId}&subtopicId=${subId}` })
-  }
-
-  const goToInterviewManage = (subId: string, name: string) => {
-    Taro.navigateTo({
-      url: `/pages/interview-manage/index?topicId=${topicId}&subtopicId=${subId}&subName=${encodeURIComponent(name)}`,
-    })
   }
 
   if (loading) {
@@ -264,12 +258,12 @@ const TopicDetailPage = () => {
                             className="flex items-center mt-3"
                             onClick={(e) => {
                               e.stopPropagation()
-                              goToInterviewManage(sub.id, sub.name)
+                              goToSubtopicMaterials(sub.id)
                             }}
                           >
-                            <Pencil size={14} color="#B45309" className="mr-1" />
+                            <BookOpen size={14} color="#B45309" className="mr-1" />
                             <Text className="text-xs text-amber-700">
-                              编辑采访记录
+                              查看历史资料
                             </Text>
                           </View>
                         </View>

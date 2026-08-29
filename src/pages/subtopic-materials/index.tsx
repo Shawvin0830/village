@@ -12,6 +12,7 @@ import {
   BookOpen,
   ChevronRight,
   FileText,
+  Pencil,
   Quote,
   ShieldCheck,
   UserRound,
@@ -347,11 +348,29 @@ const SubtopicMaterialsPage = () => {
                     </View>
 
                     {/* 采访原始文本 */}
-                    <View>
+                    <View className="mb-3">
                       <Text className="block text-xs text-stone-500 mb-2">原始文本</Text>
                       <Text className="block text-sm text-stone-600 leading-relaxed line-clamp-3 whitespace-pre-wrap">
                         {item.full_interview}
                       </Text>
+                    </View>
+
+                    {/* 编辑按钮 */}
+                    <View className="flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-stone-200"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          Taro.navigateTo({
+                            url: `/pages/interview-manage/index?topicId=${topicId}&subtopicId=${subtopicId}&subName=${encodeURIComponent(data.subtopic.name)}&editId=${item.id}`,
+                          })
+                        }}
+                      >
+                        <Pencil size={14} color="#B45309" className="mr-1" />
+                        <Text className="text-xs text-amber-700">编辑</Text>
+                      </Button>
                     </View>
                   </CardContent>
                 </Card>
