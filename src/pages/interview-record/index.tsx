@@ -7,7 +7,53 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Network } from '@/network'
-import { Mic, Square, Upload, FileText } from 'lucide-react-taro'
+import { Mic, Square, Upload, FileText, BookOpen, Users } from 'lucide-react-taro'
+
+/** 故事片段 */
+interface StoryFragment {
+  story_thread_id: string | null
+  story_thread_name: string
+  category: string
+  icon: string
+  dialect_original: string
+  mandarin_text: string
+  summary: string
+  flags: string[]
+  time_range?: string
+}
+
+/** 导览叙事 */
+interface GuidedNarrative {
+  story_thread_name: string
+  category: string
+  narrative: string
+  key_quote: string
+  visitor_hook: string
+  completeness: number
+  missing_pieces: string[]
+}
+
+/** 人物档案 */
+interface CharacterInfo {
+  name: string
+  aliases: string[]
+  tags: string[]
+  story: string
+  key_quotes: string[]
+  related_story_threads: string[]
+  mention_count: number
+  verify_flags: string[]
+}
+
+/** 分类元信息 */
+const CATEGORY_META: Record<string, { label: string; icon: string; color: string; bg: string }> = {
+  building_history: { label: '建筑史', icon: '🏛️', color: 'text-blue-600', bg: 'bg-blue-50' },
+  craft_culture:    { label: '工艺文化', icon: '🪵', color: 'text-amber-600', bg: 'bg-amber-50' },
+  iconography:      { label: '图像寓意', icon: '🎨', color: 'text-purple-600', bg: 'bg-purple-50' },
+  biography:        { label: '人物传记', icon: '👤', color: 'text-green-600', bg: 'bg-green-50' },
+  folk_custom:      { label: '民俗风情', icon: '🏮', color: 'text-pink-600', bg: 'bg-pink-50' },
+  village_change:   { label: '村落变迁', icon: '🏘️', color: 'text-cyan-600', bg: 'bg-cyan-50' },
+}
 
 const InterviewRecordPage = () => {
   const router = useRouter()
@@ -24,15 +70,15 @@ const InterviewRecordPage = () => {
   const [processing, setProcessing] = useState(false)
   const [result, setResult] = useState<{
     transcript: string
-    segments: Array<{
-      subtopic_name: string
-      dialect_original: string
-      mandarin_text: string
-      flags: string[]
-    }>
+    fragments: StoryFragment[]
+    narratives: GuidedNarrative[]
+    characters: CharacterInfo[]
+    cross_references: string[]
+    next_interview_plan: string[]
   } | null>(null)
   const [textInput, setTextInput] = useState('')
   const [useTextMode, setUseTextMode] = useState(false)
+  const [expandedFragment, setExpandedFragment] = useState<number | null>(null)
 
   useEffect(() => {
     if (isMiniApp) {
@@ -47,7 +93,7 @@ const InterviewRecordPage = () => {
         setIsRecording(false)
       })
       manager.onError((err) => {
-        console.error('录音错误', err)
+        console.error('录音错误:', err)
         Taro.showToast({ title: '录音失败', icon: 'none' })
         setIsRecording(false)
       })
@@ -159,6 +205,27 @@ const InterviewRecordPage = () => {
     }
   }
 
+  const getCompletenessColor = (v: number) => {
+    if (v >= 80) return 'text-green-600'
+    if (v >= 60) return 'text-blue-600'
+    if (v >= 30) return 'text-amber-600'
+    return 'text-red-500'
+  }
+
+  const getCompletenessLabel = (v: number) => {
+    if (v >= 80) return '丰满'
+    if (v >= 60) return '可用'
+    if (v >= 30) return '骨架'
+    return '碎片'
+  }
+
+  const getCompletenessBarColor = (v: number) => {
+    if (v >= 80) return 'bg-green-500'
+    if (v >= 60) return 'bg-blue-500'
+    if (v >= 30) return 'bg-amber-500'
+    return 'bg-red-400'
+  }
+
   return (
     <View className="min-h-screen bg-stone-50 pb-8">
       {/* 头部 */}
@@ -168,7 +235,7 @@ const InterviewRecordPage = () => {
           <Text className="block text-xl font-bold text-stone-800">录音转写</Text>
         </View>
         <Text className="block text-sm text-stone-500">
-          录音后 AI 自动转写并按子话题分段整理
+          录音后 AI 自动整理为故事线、导览叙事、人物档案
         </Text>
       </View>
 
@@ -293,7 +360,7 @@ const InterviewRecordPage = () => {
               <View className="bg-stone-50 rounded-xl p-4 mb-4">
                 <Textarea
                   style={{ width: '100%', minHeight: '150px', backgroundColor: 'transparent' }}
-                  placeholder="将采访内容粘贴或输入到这里，AI 会帮你按子话题分段整理..."
+                  placeholder="将采访内容粘贴或输入到这里，AI 会帮你按故事线分段整理..."
                   value={textInput}
                   onInput={(e) => setTextInput(e.detail.value)}
                   maxlength={5000}
@@ -311,65 +378,288 @@ const InterviewRecordPage = () => {
         </View>
       )}
 
-      {/* 转写结果 */}
+      {/* 整理结果 */}
       {result && (
         <View className="px-4 space-y-4">
-          <Text className="block text-base font-semibold text-stone-800">整理结果</Text>
+          {/* 统计概览 */}
+          <View className="flex items-center gap-4 flex-wrap">
+            <Text className="block text-base font-semibold text-stone-800">整理结果</Text>
+            <View className="flex gap-2 flex-wrap">
+              {result.narratives?.length > 0 && (
+                <Badge className="bg-amber-50 text-amber-700 border-amber-200">
+                  <Text className="text-xs">{result.narratives.length} 条故事线</Text>
+                </Badge>
+              )}
+              {result.fragments?.length > 0 && (
+                <Badge className="bg-stone-100 text-stone-600 border-stone-200">
+                  <Text className="text-xs">{result.fragments.length} 个片段</Text>
+                </Badge>
+              )}
+              {result.characters?.length > 0 && (
+                <Badge className="bg-green-50 text-green-700 border-green-200">
+                  <Text className="text-xs">{result.characters.length} 位人物</Text>
+                </Badge>
+              )}
+            </View>
+          </View>
 
-          {/* 原始转写 */}
-          {result.transcript && (
-            <Card className="border-stone-100 bg-white">
-              <CardContent className="p-4">
-                <Text className="block text-sm font-medium text-stone-700 mb-2">原始转写</Text>
-                <Text className="block text-sm text-stone-600 leading-relaxed whitespace-pre-wrap">
-                  {result.transcript}
-                </Text>
-              </CardContent>
-            </Card>
+          {/* 导览叙事（v3 核心新增） */}
+          {result.narratives && result.narratives.length > 0 && (
+            <View className="space-y-3">
+              <View className="flex items-center gap-2">
+                <BookOpen size={18} color="#B45309" />
+                <Text className="block text-sm font-semibold text-stone-800">导览故事</Text>
+              </View>
+              {result.narratives.map((narr, i) => {
+                const cat = CATEGORY_META[narr.category] || { label: narr.category, icon: '📖', color: 'text-stone-600', bg: 'bg-stone-50' }
+                return (
+                  <Card key={`narr-${i}`} className="border-stone-100 bg-white">
+                    <CardContent className="p-4">
+                      {/* 标题行 */}
+                      <View className="flex items-center gap-2 mb-3">
+                        <Text className="block text-lg">{cat.icon}</Text>
+                        <Text className="block text-sm font-semibold text-stone-800 flex-1">
+                          {narr.story_thread_name}
+                        </Text>
+                        <Badge className={`${cat.bg} ${cat.color} border-0`}>
+                          <Text className="text-xs">{cat.label}</Text>
+                        </Badge>
+                      </View>
+
+                      {/* 完整度 */}
+                      <View className="flex items-center gap-2 mb-3">
+                        <View className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                          <View
+                            className={`h-full rounded-full ${getCompletenessBarColor(narr.completeness)}`}
+                            style={{ width: `${narr.completeness}%` }}
+                          />
+                        </View>
+                        <Text className={`block text-xs font-semibold ${getCompletenessColor(narr.completeness)}`}>
+                          {getCompletenessLabel(narr.completeness)} {narr.completeness}%
+                        </Text>
+                      </View>
+
+                      {/* 游客引子 */}
+                      {narr.visitor_hook && (
+                        <View className="bg-amber-50 rounded-lg px-3 py-2 mb-3 border-l-2 border-amber-400">
+                          <Text className="block text-sm text-amber-800 font-medium">
+                            {narr.visitor_hook}
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* 导览叙事正文 */}
+                      <Text className="block text-sm text-stone-700 leading-relaxed mb-3">
+                        {narr.narrative}
+                      </Text>
+
+                      {/* 关键引言 */}
+                      {narr.key_quote && (
+                        <View className="bg-purple-50 rounded-lg px-3 py-2 mb-3 border-l-2 border-purple-300">
+                          <Text className="block text-xs text-purple-400 mb-1">最动人的话</Text>
+                          <Text className="block text-sm text-purple-700 italic">
+                            "{narr.key_quote}"
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* 缺失信息 */}
+                      {narr.missing_pieces && narr.missing_pieces.length > 0 && (
+                        <View className="mt-2">
+                          <Text className="block text-xs font-medium text-amber-600 mb-1">
+                            还缺什么
+                          </Text>
+                          <View className="flex flex-wrap gap-1">
+                            {narr.missing_pieces.map((piece, j) => (
+                              <Badge key={j} className="bg-amber-50 text-amber-600 border-amber-200">
+                                <Text className="text-xs">{piece}</Text>
+                              </Badge>
+                            ))}
+                          </View>
+                        </View>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </View>
           )}
 
-          {/* 分段结果 */}
-          {result.segments && result.segments.map((seg, i) => (
-            <Card key={i} className="border-stone-100 bg-white">
-              <CardContent className="p-4">
-                <Text className="block text-sm font-semibold text-stone-800 mb-2">
-                  📝 {seg.subtopic_name}
-                </Text>
-                {seg.dialect_original && (
-                  <View className="bg-amber-50 rounded-lg p-3 mb-2">
-                    <Text className="block text-xs text-amber-700 mb-1">方言原话</Text>
-                    <Text className="block text-sm text-stone-700 italic">
-                      {seg.dialect_original}
-                    </Text>
-                  </View>
-                )}
-                {seg.mandarin_text && (
-                  <View className="mb-2">
-                    <Text className="block text-xs text-stone-400 mb-1">普通话转写</Text>
-                    <Text className="block text-sm text-stone-600">{seg.mandarin_text}</Text>
-                  </View>
-                )}
-                {seg.flags && seg.flags.length > 0 && (
-                  <View className="flex flex-wrap gap-1 mt-2">
-                    {seg.flags.map((flag, j) => (
-                      <Badge
-                        key={j}
-                        className={`text-xs ${
-                          flag.includes('待核实')
-                            ? 'bg-red-50 text-red-600'
-                            : flag.includes('新发现')
-                              ? 'bg-amber-50 text-amber-700'
-                              : 'bg-green-50 text-green-700'
-                        }`}
-                      >
-                        <Text className="text-xs">{flag}</Text>
+          {/* 故事片段（原始素材） */}
+          {result.fragments && result.fragments.length > 0 && (
+            <View className="space-y-3">
+              <Text className="block text-sm font-semibold text-stone-800">
+                采访原文（点击展开方言/普通话对照）
+              </Text>
+              {result.fragments.map((frag, i) => {
+                const cat = CATEGORY_META[frag.category] || { label: frag.category, icon: '📝', color: 'text-stone-600', bg: 'bg-stone-50' }
+                const isExpanded = expandedFragment === i
+                return (
+                  <Card
+                    key={`frag-${i}`}
+                    className="border-stone-100 bg-white"
+                    onClick={() => setExpandedFragment(isExpanded ? null : i)}
+                  >
+                    <CardContent className="p-4">
+                      <View className="flex items-center gap-2 mb-2">
+                        <Text className="block text-base">{frag.icon || cat.icon}</Text>
+                        <Text className="block text-sm font-semibold text-stone-800 flex-1">
+                          {frag.story_thread_name}
+                        </Text>
+                        <Badge className={`${cat.bg} ${cat.color} border-0`}>
+                          <Text className="text-xs">{cat.label}</Text>
+                        </Badge>
+                      </View>
+                      <View className="pl-3 border-l-2 border-amber-400 mb-2">
+                        <Text className="block text-sm text-amber-700 font-medium">
+                          {frag.summary}
+                        </Text>
+                      </View>
+                      {frag.flags && frag.flags.length > 0 && (
+                        <View className="flex flex-wrap gap-1">
+                          {frag.flags.map((flag, j) => (
+                            <Badge
+                              key={j}
+                              className={`text-xs ${
+                                flag.includes('待核实')
+                                  ? 'bg-red-50 text-red-600 border-red-200'
+                                  : flag.includes('新发现')
+                                    ? 'bg-green-50 text-green-700 border-green-200'
+                                    : 'bg-blue-50 text-blue-600 border-blue-200'
+                              }`}
+                            >
+                              <Text className="text-xs">{flag}</Text>
+                            </Badge>
+                          ))}
+                        </View>
+                      )}
+
+                      {/* 展开详情 */}
+                      {isExpanded && (
+                        <View className="mt-3 space-y-2">
+                          {frag.dialect_original && (
+                            <View className="bg-purple-50 rounded-lg p-3">
+                              <Text className="block text-xs text-purple-400 mb-1">方言原文</Text>
+                              <Text className="block text-sm text-stone-700 italic">
+                                {frag.dialect_original}
+                              </Text>
+                            </View>
+                          )}
+                          {frag.mandarin_text && (
+                            <View className="bg-blue-50 rounded-lg p-3">
+                              <Text className="block text-xs text-blue-400 mb-1">普通话转写</Text>
+                              <Text className="block text-sm text-stone-600">
+                                {frag.mandarin_text}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </View>
+          )}
+
+          {/* 人物档案 */}
+          {result.characters && result.characters.length > 0 && (
+            <View className="space-y-3">
+              <View className="flex items-center gap-2">
+                <Users size={18} color="#4D7C0F" />
+                <Text className="block text-sm font-semibold text-stone-800">人物档案</Text>
+              </View>
+              {result.characters.map((char, i) => (
+                <Card key={`char-${i}`} className="border-stone-100 bg-white">
+                  <CardContent className="p-4">
+                    <View className="flex items-center gap-3 mb-2">
+                      <View className="w-10 h-10 rounded-full bg-amber-600 flex items-center justify-center">
+                        <Text className="block text-white font-bold text-base">
+                          {char.name.charAt(0)}
+                        </Text>
+                      </View>
+                      <View className="flex-1">
+                        <Text className="block text-sm font-semibold text-stone-800">
+                          {char.name}
+                        </Text>
+                        {char.aliases && char.aliases.length > 0 && (
+                          <Text className="block text-xs text-stone-400">
+                            又称：{char.aliases.join('、')}
+                          </Text>
+                        )}
+                      </View>
+                      <Badge className="bg-stone-100 text-stone-500 border-stone-200">
+                        <Text className="text-xs">提及 {char.mention_count} 次</Text>
                       </Badge>
-                    ))}
-                  </View>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                    </View>
+                    {char.tags && char.tags.length > 0 && (
+                      <View className="flex flex-wrap gap-1 mb-2">
+                        {char.tags.map((tag, j) => (
+                          <Badge key={j} className="bg-amber-50 text-amber-700 border-amber-200">
+                            <Text className="text-xs">{tag}</Text>
+                          </Badge>
+                        ))}
+                      </View>
+                    )}
+                    <Text className="block text-sm text-stone-600 leading-relaxed mb-2">
+                      {char.story}
+                    </Text>
+                    {char.key_quotes && char.key_quotes.length > 0 && (
+                      <View className="bg-purple-50 rounded-lg px-3 py-2 border-l-2 border-purple-300">
+                        {char.key_quotes.map((q, j) => (
+                          <Text key={j} className="block text-sm text-purple-700 italic mb-1">
+                            "{q}"
+                          </Text>
+                        ))}
+                      </View>
+                    )}
+                    {char.related_story_threads && char.related_story_threads.length > 0 && (
+                      <View className="flex flex-wrap gap-1 mt-2">
+                        {char.related_story_threads.map((thread, j) => (
+                          <Badge key={j} className="bg-blue-50 text-blue-600 border-blue-200">
+                            <Text className="text-xs">📖 {thread}</Text>
+                          </Badge>
+                        ))}
+                      </View>
+                    )}
+                    {char.verify_flags && char.verify_flags.length > 0 && (
+                      <Text className="block text-xs text-amber-500 mt-2">
+                        ⚠️ {char.verify_flags.join(' · ')}
+                      </Text>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </View>
+          )}
+
+          {/* 下次采访建议 */}
+          {result.next_interview_plan && result.next_interview_plan.length > 0 && (
+            <View className="space-y-2">
+              <Text className="block text-sm font-semibold text-stone-800">
+                下次采访建议
+              </Text>
+              {result.next_interview_plan.map((plan, i) => (
+                <View key={i} className="bg-amber-50 rounded-lg px-4 py-3 border-l-2 border-amber-400">
+                  <Text className="block text-sm text-stone-700">{plan}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* 跨故事线关联 */}
+          {result.cross_references && result.cross_references.length > 0 && (
+            <View className="space-y-2">
+              <Text className="block text-sm font-semibold text-stone-800">
+                跨故事线关联
+              </Text>
+              {result.cross_references.map((ref, i) => (
+                <View key={i} className="bg-blue-50 rounded-lg px-4 py-3 border-l-2 border-blue-300">
+                  <Text className="block text-sm text-stone-700">{ref}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       )}
     </View>
