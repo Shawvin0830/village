@@ -182,6 +182,22 @@ export default defineConfig<'vite'>(async (merge, _env) => {
                       fs.copyFileSync(path.join(iconsSrc, file), path.join(iconsDest, file));
                     });
                   }
+                  // Fix PWA paths in index.html (Vite hashes/transforms asset refs)
+                  const indexHtmlPath = path.resolve(__dirname, '..', outputRoot, 'index.html');
+                  if (fs.existsSync(indexHtmlPath)) {
+                    let html = fs.readFileSync(indexHtmlPath, 'utf-8');
+                    // Replace Vite-transformed manifest path
+                    html = html.replace(
+                      /href="\.\/json\/manifest\.[^"]+\.json"/,
+                      'href="./static/manifest.json"',
+                    );
+                    // Replace Vite-transformed icon path
+                    html = html.replace(
+                      /href="\.\/static\/images\/icon-192x192\.png"/,
+                      'href="./static/icons/icon-192x192.png"',
+                    );
+                    fs.writeFileSync(indexHtmlPath, html);
+                  }
                   console.log('PWA assets copied to', destDir);
                 },
               },
