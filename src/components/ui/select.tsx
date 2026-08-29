@@ -363,18 +363,19 @@ SelectLabel.displayName = "SelectLabel"
 
 const SelectItem = React.forwardRef<
   React.ElementRef<typeof View>,
-  React.ComponentPropsWithoutRef<typeof View> & { value: string; disabled?: boolean }
->(({ className, children, value, disabled, onClick, ...props }, ref) => {
+  React.ComponentPropsWithoutRef<typeof View> & { value: string; disabled?: boolean; label?: string }
+>(({ className, children, value, disabled, onClick, label, ...props }, ref) => {
   const context = React.useContext(SelectContext)
   const isSelected = context?.value === value
 
   const labelText = React.useMemo(() => {
+    if (label) return label
     if (typeof children === "string") return children
     if (Array.isArray(children) && children.every((c) => typeof c === "string")) {
       return children.join("")
     }
     return undefined
-  }, [children])
+  }, [children, label])
 
   React.useEffect(() => {
     if (isSelected && labelText) {

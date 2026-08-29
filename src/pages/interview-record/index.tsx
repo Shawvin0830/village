@@ -397,7 +397,7 @@ const InterviewRecordPage = () => {
             </SelectTrigger>
             <SelectContent>
               {subtopics.map((sub) => (
-                <SelectItem key={sub.id} value={sub.id}>
+                <SelectItem key={sub.id} value={sub.id} label={`${sub.icon} ${sub.name}`}>
                   <Text>{sub.icon} {sub.name}</Text>
                 </SelectItem>
               ))}
@@ -705,7 +705,7 @@ const InterviewRecordPage = () => {
                       </SelectTrigger>
                       <SelectContent>
                         {subtopics.map((sub) => (
-                          <SelectItem key={sub.id} value={sub.id}>
+                          <SelectItem key={sub.id} value={sub.id} label={`${sub.icon} ${sub.name}`}>
                             <Text>{sub.icon} {sub.name}</Text>
                           </SelectItem>
                         ))}
