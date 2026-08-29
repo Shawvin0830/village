@@ -135,6 +135,11 @@ const InterviewPlanPage = () => {
   const [researchDoc, setResearchDoc] = useState<ResearchDocument | null>(null)
   const [researchFocus, setResearchFocus] = useState('')
 
+  // 策划文档折叠状态
+  const [showContext, setShowContext] = useState(false)
+  const [showDimensions, setShowDimensions] = useState(false)
+  const [expandedIntent, setExpandedIntent] = useState<number | null>(null)
+
   // 讨论调整状态
   const [feedback, setFeedback] = useState('')
   const [refining, setRefining] = useState(false)
@@ -912,24 +917,40 @@ const InterviewPlanPage = () => {
               </View>
 
               {plan.context_summary && (
-                <View className="mb-5">
-                  <Text className="block text-sm font-semibold text-stone-700 mb-2">背景信息</Text>
-                  <Text className="block text-sm text-stone-600 leading-relaxed whitespace-pre-wrap">
-                    {plan.context_summary}
-                  </Text>
+                <View className="mb-4">
+                  <View
+                    className="flex items-center justify-between"
+                    onClick={() => setShowContext(!showContext)}
+                  >
+                    <Text className="block text-sm font-semibold text-stone-700">背景信息</Text>
+                    {showContext ? <ChevronUp size={16} color="#78716C" /> : <ChevronDown size={16} color="#78716C" />}
+                  </View>
+                  {showContext && (
+                    <Text className="block text-sm text-stone-600 leading-relaxed whitespace-pre-wrap mt-2">
+                      {plan.context_summary}
+                    </Text>
+                  )}
                 </View>
               )}
 
               {plan.selected_dimensions && plan.selected_dimensions.length > 0 && (
-                <View className="mb-5">
-                  <Text className="block text-sm font-semibold text-stone-700 mb-2">采访维度</Text>
-                  <View className="flex flex-wrap gap-2">
-                    {plan.selected_dimensions.map((dim, i) => (
-                      <Badge key={i} className="bg-amber-50 text-amber-800 border-amber-200">
-                        {dim}
-                      </Badge>
-                    ))}
+                <View className="mb-4">
+                  <View
+                    className="flex items-center justify-between"
+                    onClick={() => setShowDimensions(!showDimensions)}
+                  >
+                    <Text className="block text-sm font-semibold text-stone-700">采访维度</Text>
+                    {showDimensions ? <ChevronUp size={16} color="#78716C" /> : <ChevronDown size={16} color="#78716C" />}
                   </View>
+                  {showDimensions && (
+                    <View className="flex flex-wrap gap-2 mt-2">
+                      {plan.selected_dimensions.map((dim, i) => (
+                        <Badge key={i} className="bg-amber-50 text-amber-800 border-amber-200">
+                          {dim}
+                        </Badge>
+                      ))}
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -950,31 +971,30 @@ const InterviewPlanPage = () => {
               {plan.core_questions && plan.core_questions.length > 0 && (
                 <View className="mb-5">
                   <Text className="block text-sm font-semibold text-stone-700 mb-3">核心问题</Text>
-                  <View className="space-y-4">
+                  <View className="space-y-3">
                     {plan.core_questions.map((q, i) => (
-                      <View key={i} className="pl-3 border-l-2 border-amber-200">
-                        <View className="flex items-center gap-2 mb-1">
-                          <Badge className="bg-amber-50 text-amber-800 border-amber-200 text-xs">
-                            {q.dimension}
-                          </Badge>
-                        </View>
+                      <View key={i} className="pl-3 border-l-2 border-stone-200">
                         <View className="mb-1">
-                          <Text className="block text-sm text-stone-700 font-medium">{q.child_version}</Text>
-                        </View>
-                        <View className="mb-1">
-                          <Text className="block text-xs text-stone-500">
-                            <Text className="font-medium">大人备用：</Text>{q.adult_version}
-                          </Text>
+                          <Text className="block text-sm text-stone-800">{q.child_version}</Text>
                         </View>
                         {q.why_ask && (
-                          <View className="mb-1">
-                            <Text className="block text-xs text-stone-400 italic">
-                              意图：{q.why_ask}
+                          <View
+                            className="flex items-center gap-1"
+                            onClick={() => setExpandedIntent(expandedIntent === i ? null : i)}
+                          >
+                            <Text className="block text-xs text-stone-400">意图</Text>
+                            {expandedIntent === i ? <ChevronUp size={12} color="#9CA3AF" /> : <ChevronDown size={12} color="#9CA3AF" />}
+                          </View>
+                        )}
+                        {q.why_ask && expandedIntent === i && (
+                          <View className="mt-1">
+                            <Text className="block text-xs text-stone-400">
+                              {q.why_ask}
                             </Text>
                           </View>
                         )}
                         {q.follow_up && (
-                          <View>
+                          <View className="mt-1">
                             <Text className="block text-xs text-stone-400">
                               追问：{q.follow_up}
                             </Text>
