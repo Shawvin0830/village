@@ -1,5 +1,5 @@
 import { View, Text } from '@tarojs/components'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -69,6 +69,7 @@ const IndexPage = () => {
   const [topics, setTopics] = useState<Topic[]>([])
   const [selectedTopicId, setSelectedTopicId] = useState<string>('')
   const [showTopicPicker, setShowTopicPicker] = useState(false)
+  const [selectedTopicDetail, setSelectedTopicDetail] = useState<Topic | null>(null)
 
   const fetchTopics = useCallback(async () => {
     try {
@@ -94,7 +95,28 @@ const IndexPage = () => {
     fetchTopics()
   })
 
-  const selectedTopic = topics.find(t => t.id === selectedTopicId) || null
+  // 选中话题后，获取完整话题详情（含子话题列表）
+  useEffect(() => {
+    if (!selectedTopicId) return
+    setSelectedTopicDetail(null) // 切换时先清除旧数据
+    let cancelled = false
+    const fetchDetail = async () => {
+      try {
+        const res = await Network.request({ url: `/api/topics/${selectedTopicId}` })
+        console.log('Topic detail response:', res.data)
+        if (!cancelled) {
+          const detail = res.data?.data
+          setSelectedTopicDetail(detail || null)
+        }
+      } catch (err) {
+        console.error('获取话题详情失败:', err)
+      }
+    }
+    fetchDetail()
+    return () => { cancelled = true }
+  }, [selectedTopicId])
+
+  const selectedTopic = selectedTopicDetail || topics.find(t => t.id === selectedTopicId) || null
 
   const handleSelectTopic = (topicId: string) => {
     setSelectedTopicId(topicId)
@@ -231,7 +253,7 @@ const IndexPage = () => {
         <View className="px-4">
           <Text className="block text-base font-semibold text-stone-800 mb-3">子话题进展</Text>
           
-          {selectedTopic.subtopics.length === 0 ? (
+          {(selectedTopic.subtopics?.length ?? 0) === 0 ? (
             <Card className="border-stone-100 bg-white">
               <CardContent className="p-6 flex flex-col items-center">
                 <Text className="block text-3xl mb-2">🌱</Text>
@@ -249,8 +271,8 @@ const IndexPage = () => {
             </Card>
           ) : (
             <View className="space-y-3">
-              {selectedTopic.subtopics.map((subtopic) => {
-                const progress = getSubtopicProgress(subtopic, selectedTopic.has_interview_plan)
+              {(selectedTopic.subtopics || []).map((subtopic) => {
+                const progress = getSubtopicProgress(subtopic, selectedTopic.has_interview_plan ?? false)
                 const currentStep = getCurrentStep(progress)
                 
                 return (

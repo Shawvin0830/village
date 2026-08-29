@@ -137,7 +137,13 @@ export class TopicsService {
       .order('created_at', { ascending: true });
     if (subError) throw new Error(`查询子话题失败: ${subError.message}`);
 
-    return { ...topic, subtopics: subtopics || [] };
+    // 检查是否存在采访策划
+    const { count: planCount } = await this.client
+      .from('interview_plans')
+      .select('*', { count: 'exact', head: true })
+      .eq('topic_id', id);
+
+    return { ...topic, subtopics: subtopics || [], has_interview_plan: (planCount || 0) > 0 };
   }
 
   async create(name: string, description?: string) {
