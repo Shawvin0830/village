@@ -55,7 +55,12 @@ export class TopicsController {
   async updateAuth(
     @Param('id') id: string,
     @Param('subId') subId: string,
-    @Body() body: { auth_level: string; auth_method?: string; auth_person?: string },
+    @Body() body: {
+      auth_level: string;
+      auth_method?: string;
+      auth_person?: string;
+      restriction?: string;
+    },
   ) {
     const data = await this.topicsService.updateSubtopicAuth(
       id,
@@ -63,6 +68,7 @@ export class TopicsController {
       body.auth_level,
       body.auth_method,
       body.auth_person,
+      body.restriction,
     );
     return { code: 200, msg: 'success', data };
   }

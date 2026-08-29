@@ -1,4 +1,4 @@
-import { pgTable, index, foreignKey, varchar, timestamp, text, serial, jsonb, integer, pgPolicy } from "drizzle-orm/pg-core"
+import { pgTable, index, foreignKey, varchar, timestamp, text, serial, jsonb, integer, boolean, pgPolicy } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 
@@ -14,6 +14,7 @@ export const subtopics = pgTable("subtopics", {
 	authMethod: varchar("auth_method", { length: 50 }),
 	authPerson: varchar("auth_person", { length: 100 }),
 	authTime: timestamp("auth_time", { withTimezone: true, mode: 'string' }),
+	authRestriction: text("auth_restriction"),
 	summary: text(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
@@ -78,6 +79,34 @@ export const interviewRecords = pgTable("interview_records", {
 			foreignColumns: [subtopics.id],
 			name: "interview_records_subtopic_id_subtopics_id_fk"
 		}).onDelete("set null"),
+]);
+
+export const authorizationRecords = pgTable("authorization_records", {
+	id: varchar({ length: 36 }).default(sql`gen_random_uuid()`).primaryKey().notNull(),
+	topicId: varchar("topic_id", { length: 36 }).notNull(),
+	subtopicId: varchar("subtopic_id", { length: 36 }).notNull(),
+	authLevel: varchar("auth_level", { length: 20 }).notNull(),
+	authMethod: varchar("auth_method", { length: 50 }),
+	authPerson: varchar("auth_person", { length: 100 }),
+	restriction: text(),
+	authorizedAt: timestamp("authorized_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	reversible: boolean().default(true).notNull(),
+	previousLevel: varchar("previous_level", { length: 20 }),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("authorization_records_topic_id_idx").using("btree", table.topicId.asc().nullsLast().op("text_ops")),
+	index("authorization_records_subtopic_id_idx").using("btree", table.subtopicId.asc().nullsLast().op("text_ops")),
+	index("authorization_records_auth_level_idx").using("btree", table.authLevel.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.topicId],
+			foreignColumns: [topics.id],
+			name: "authorization_records_topic_id_topics_id_fk"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.subtopicId],
+			foreignColumns: [subtopics.id],
+			name: "authorization_records_subtopic_id_subtopics_id_fk"
+		}).onDelete("cascade"),
 ]);
 
 export const topics = pgTable("topics", {

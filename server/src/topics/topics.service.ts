@@ -41,7 +41,7 @@ export class TopicsService {
 
     const { data: subtopics, error: subError } = await this.client
       .from('subtopics')
-      .select('id, name, icon, transcript_status, verify_status, auth_level, auth_method, auth_person, auth_time, summary')
+      .select('id, name, icon, transcript_status, verify_status, auth_level, auth_method, auth_person, auth_time, auth_restriction, summary')
       .eq('topic_id', id)
       .order('created_at', { ascending: true });
     if (subError) throw new Error(`查询子话题失败: ${subError.message}`);
@@ -62,7 +62,7 @@ export class TopicsService {
   async getSubtopics(topicId: string) {
     const { data, error } = await this.client
       .from('subtopics')
-      .select('id, name, icon, transcript_status, verify_status, auth_level, auth_method, auth_person, auth_time, summary')
+      .select('id, name, icon, transcript_status, verify_status, auth_level, auth_method, auth_person, auth_time, auth_restriction, summary')
       .eq('topic_id', topicId)
       .order('created_at', { ascending: true });
     if (error) throw new Error(`查询子话题失败: ${error.message}`);
@@ -95,8 +95,9 @@ export class TopicsService {
     authLevel: string,
     authMethod?: string,
     authPerson?: string,
+    restriction?: string,
   ) {
-    return this.authSkill.updateAuth(topicId, subtopicId, authLevel, authMethod, authPerson);
+    return this.authSkill.updateAuth(topicId, subtopicId, authLevel, authMethod, authPerson, restriction);
   }
 
   async getAuthList(topicId: string) {
@@ -124,7 +125,7 @@ export class TopicsService {
 
     const { data: subtopics, error: subError } = await this.client
       .from('subtopics')
-      .select('id, name, icon, transcript_status, verify_status, auth_level, summary')
+      .select('id, name, icon, transcript_status, verify_status, auth_level, auth_restriction, summary')
       .eq('topic_id', topic.id)
       .order('created_at', { ascending: true });
     if (subError) throw new Error(`查询子话题失败: ${subError.message}`);
@@ -144,13 +145,13 @@ export class TopicsService {
       nextSteps.push('先为话题添加几个子话题，比如"木雕""屋脊装饰"等');
       nextSteps.push('然后去"采访策划"生成采访问题清单');
     } else if (hasUntranscribed) {
-      nextSteps.push('有子话题还没转录，去"录音转写"整理采访内容');
+      nextSteps.push('有子话题还没有整理好的采访内容，可以先用外部工具整理后再上传或录入');
     }
     if (hasPendingVerify) {
       nextSteps.push('有内容待核实，需要查证相关信息');
     }
     if (hasUnauthorized) {
-      nextSteps.push('转录完成的内容需要确认授权级别');
+      nextSteps.push('采访内容整理完成的子话题需要确认授权级别');
     }
     if (allDone) {
       nextSteps.push('🎉 阶段性完成！可以继续深挖某个子话题，或开始新话题');
