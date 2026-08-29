@@ -11,10 +11,6 @@ export const subtopics = pgTable("subtopics", {
 	transcriptStatus: varchar("transcript_status", { length: 20 }).default('not_started').notNull(),
 	verifyStatus: varchar("verify_status", { length: 20 }).default('not_started').notNull(),
 	authLevel: varchar("auth_level", { length: 20 }).default('not_set').notNull(),
-	authMethod: varchar("auth_method", { length: 50 }),
-	authPerson: varchar("auth_person", { length: 100 }),
-	authTime: timestamp("auth_time", { withTimezone: true, mode: 'string' }),
-	authRestriction: text("auth_restriction"),
 	summary: text(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
@@ -41,9 +37,7 @@ export const interviewPlans = pgTable("interview_plans", {
 	adultQuestions: jsonb("adult_questions"),
 	childQuestions: jsonb("child_questions"),
 	tips: jsonb(),
-	status: varchar({ length: 20 }).default('draft').notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
 }, (table) => [
 	index("interview_plans_topic_id_idx").using("btree", table.topicId.asc().nullsLast().op("text_ops")),
 	foreignKey({
@@ -83,27 +77,83 @@ export const interviewRecords = pgTable("interview_records", {
 		}).onDelete("set null"),
 ]);
 
+export const interviewees = pgTable("interviewees", {
+	id: varchar({ length: 36 }).default(sql`gen_random_uuid()`).primaryKey().notNull(),
+	topicId: varchar("topic_id", { length: 36 }).notNull(),
+	name: varchar({ length: 100 }).notNull(),
+	age: varchar({ length: 30 }),
+	occupation: varchar({ length: 100 }),
+	role: varchar({ length: 100 }),
+	authStatus: varchar("auth_status", { length: 30 }).default('pending').notNull(),
+	authMethod: varchar("auth_method", { length: 50 }),
+	authNote: text("auth_note"),
+	topicAffiliations: jsonb("topic_affiliations").default(sql`'[]'::jsonb`).notNull(),
+	confirmedAt: timestamp("confirmed_at", { withTimezone: true, mode: 'string' }),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+}, (table) => [
+	index("interviewees_topic_id_idx").using("btree", table.topicId.asc().nullsLast().op("text_ops")),
+	index("interviewees_auth_status_idx").using("btree", table.authStatus.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.topicId],
+			foreignColumns: [topics.id],
+			name: "interviewees_topic_id_topics_id_fk"
+		}).onDelete("cascade"),
+]);
+
+export const intervieweeTopicLinks = pgTable("interviewee_topic_links", {
+	id: varchar({ length: 36 }).default(sql`gen_random_uuid()`).primaryKey().notNull(),
+	topicId: varchar("topic_id", { length: 36 }).notNull(),
+	intervieweeId: varchar("interviewee_id", { length: 36 }).notNull(),
+	primaryTopic: varchar("primary_topic", { length: 100 }).notNull(),
+	secondaryTopic: varchar("secondary_topic", { length: 100 }).notNull(),
+	source: varchar({ length: 30 }).default('manual').notNull(),
+	confidence: integer().default(100).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("interviewee_topic_links_topic_id_idx").using("btree", table.topicId.asc().nullsLast().op("text_ops")),
+	index("interviewee_topic_links_interviewee_id_idx").using("btree", table.intervieweeId.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.topicId],
+			foreignColumns: [topics.id],
+			name: "interviewee_topic_links_topic_id_topics_id_fk"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.intervieweeId],
+			foreignColumns: [interviewees.id],
+			name: "interviewee_topic_links_interviewee_id_interviewees_id_fk"
+		}).onDelete("cascade"),
+]);
+
 export const authorizationRecords = pgTable("authorization_records", {
 	id: varchar({ length: 36 }).default(sql`gen_random_uuid()`).primaryKey().notNull(),
 	topicId: varchar("topic_id", { length: 36 }).notNull(),
-	subtopicId: varchar("subtopic_id", { length: 36 }).notNull(),
-	authLevel: varchar("auth_level", { length: 20 }).notNull(),
+	intervieweeId: varchar("interviewee_id", { length: 36 }),
+	subtopicId: varchar("subtopic_id", { length: 36 }),
+	authStatus: varchar("auth_status", { length: 30 }).notNull(),
 	authMethod: varchar("auth_method", { length: 50 }),
 	authPerson: varchar("auth_person", { length: 100 }),
 	restriction: text(),
+	topicAffiliations: jsonb("topic_affiliations").default(sql`'[]'::jsonb`).notNull(),
 	authorizedAt: timestamp("authorized_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	reversible: boolean().default(true).notNull(),
-	previousLevel: varchar("previous_level", { length: 20 }),
+	previousStatus: varchar("previous_status", { length: 30 }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	index("authorization_records_topic_id_idx").using("btree", table.topicId.asc().nullsLast().op("text_ops")),
+	index("authorization_records_interviewee_id_idx").using("btree", table.intervieweeId.asc().nullsLast().op("text_ops")),
 	index("authorization_records_subtopic_id_idx").using("btree", table.subtopicId.asc().nullsLast().op("text_ops")),
-	index("authorization_records_auth_level_idx").using("btree", table.authLevel.asc().nullsLast().op("text_ops")),
+	index("authorization_records_auth_status_idx").using("btree", table.authStatus.asc().nullsLast().op("text_ops")),
 	foreignKey({
 			columns: [table.topicId],
 			foreignColumns: [topics.id],
 			name: "authorization_records_topic_id_topics_id_fk"
 		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.intervieweeId],
+			foreignColumns: [interviewees.id],
+			name: "authorization_records_interviewee_id_interviewees_id_fk"
+		}).onDelete("set null"),
 	foreignKey({
 			columns: [table.subtopicId],
 			foreignColumns: [subtopics.id],

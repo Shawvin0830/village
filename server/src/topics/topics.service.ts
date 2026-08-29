@@ -41,7 +41,7 @@ export class TopicsService {
 
     const { data: subtopics, error: subError } = await this.client
       .from('subtopics')
-      .select('id, name, icon, transcript_status, verify_status, auth_level, auth_method, auth_person, auth_time, auth_restriction, summary')
+      .select('id, name, icon, transcript_status, verify_status, auth_level, summary')
       .eq('topic_id', id)
       .order('created_at', { ascending: true });
     if (subError) throw new Error(`查询子话题失败: ${subError.message}`);
@@ -62,7 +62,7 @@ export class TopicsService {
   async getSubtopics(topicId: string) {
     const { data, error } = await this.client
       .from('subtopics')
-      .select('id, name, icon, transcript_status, verify_status, auth_level, auth_method, auth_person, auth_time, auth_restriction, summary')
+      .select('id, name, icon, transcript_status, verify_status, auth_level, summary')
       .eq('topic_id', topicId)
       .order('created_at', { ascending: true });
     if (error) throw new Error(`查询子话题失败: ${error.message}`);
@@ -97,7 +97,28 @@ export class TopicsService {
     authPerson?: string,
     restriction?: string,
   ) {
-    return this.authSkill.updateAuth(topicId, subtopicId, authLevel, authMethod, authPerson, restriction);
+    return this.authSkill.updateAuth(
+      topicId,
+      subtopicId,
+      authLevel,
+      authMethod,
+      authPerson,
+      restriction,
+    );
+  }
+
+  async updateIntervieweeAuthorization(
+    topicId: string,
+    intervieweeId: string,
+    payload: {
+      name?: string;
+      authStatus: string;
+      authMethod?: string;
+      authNote?: string;
+      topicAffiliations?: Array<{ primary: string; secondary: string }>;
+    },
+  ) {
+    return this.authSkill.updateIntervieweeAuthorization(topicId, intervieweeId, payload);
   }
 
   async getAuthList(topicId: string) {
@@ -125,7 +146,7 @@ export class TopicsService {
 
     const { data: subtopics, error: subError } = await this.client
       .from('subtopics')
-      .select('id, name, icon, transcript_status, verify_status, auth_level, auth_restriction, summary')
+      .select('id, name, icon, transcript_status, verify_status, auth_level, summary')
       .eq('topic_id', topic.id)
       .order('created_at', { ascending: true });
     if (subError) throw new Error(`查询子话题失败: ${subError.message}`);
@@ -151,7 +172,7 @@ export class TopicsService {
       nextSteps.push('有内容待核实，需要查证相关信息');
     }
     if (hasUnauthorized) {
-      nextSteps.push('采访内容整理完成的子话题需要确认授权级别');
+      nextSteps.push('采访内容整理完成后，需要确认受访人授权状态和话题归属');
     }
     if (allDone) {
       nextSteps.push('🎉 阶段性完成！可以继续深挖某个子话题，或开始新话题');

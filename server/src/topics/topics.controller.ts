@@ -73,6 +73,33 @@ export class TopicsController {
     return { code: 200, msg: 'success', data };
   }
 
+  @Post(':id/interviewees/:intervieweeId/authorization')
+  @HttpCode(200)
+  async updateIntervieweeAuthorization(
+    @Param('id') id: string,
+    @Param('intervieweeId') intervieweeId: string,
+    @Body() body: {
+      name?: string;
+      auth_status: string;
+      auth_method?: string;
+      auth_note?: string;
+      topic_affiliations?: Array<{ primary: string; secondary: string }>;
+    },
+  ) {
+    const data = await this.topicsService.updateIntervieweeAuthorization(
+      id,
+      intervieweeId,
+      {
+        name: body.name,
+        authStatus: body.auth_status,
+        authMethod: body.auth_method,
+        authNote: body.auth_note,
+        topicAffiliations: body.topic_affiliations,
+      },
+    );
+    return { code: 200, msg: 'success', data };
+  }
+
   @Delete(':id/subtopics/:subId')
   @HttpCode(200)
   async deleteSubtopic(

@@ -11,77 +11,123 @@ import { Textarea } from "@/components/ui/textarea";
 import { Network } from "@/network";
 import {
   Check,
+  CircleAlert,
+  Clock,
   FileText,
+  RotateCcw,
   ShieldCheck,
   Tags,
-  TriangleAlert,
   UserRound,
-  Users,
 } from "lucide-react-taro";
 
-interface IntervieweeOverview {
+interface TopicAffiliation {
+  primary: string;
+  secondary: string;
+}
+
+interface TaxonomyGroup {
+  code: string;
+  primary: string;
+  secondary: string[];
+}
+
+interface IntervieweeCard {
+  id: string;
   name: string;
   age?: string | null;
   occupation?: string | null;
   role?: string | null;
-  tags?: string[];
-  claim_count: number;
-}
-
-interface SubtopicAuthItem {
-  id: string;
-  name: string;
-  icon: string;
-  content_summary: string;
-  source_label: string;
-  source_excerpt: string;
-  interviewees?: IntervieweeOverview[];
-  transcript_status: string;
-  verify_status: string;
-  pending_verify?: string[];
-  risk_warnings?: string[];
-  auth_level: string;
-  auth_level_label: string;
-  auth_level_icon: string;
-  auth_method: string | null;
-  auth_person: string | null;
-  auth_time: string | null;
-  auth_restriction: string | null;
-  can_auth: boolean;
+  auth_status: string;
+  auth_status_label: string;
+  auth_method?: string | null;
+  auth_method_label?: string;
+  auth_note?: string | null;
+  topic_affiliations: TopicAffiliation[];
+  suggested_affiliations?: TopicAffiliation[];
+  source_count: number;
+  source_summary?: string;
+  confirmed_at?: string | null;
+  is_temporary?: boolean;
 }
 
 interface AuthListData {
   topic_id: string;
   topic_name: string;
-  interviewees?: IntervieweeOverview[];
-  subtopics: SubtopicAuthItem[];
-  auth_levels: Array<{ value: string; label: string; icon: string }>;
+  stats: {
+    total: number;
+    pending: number;
+    agreed: number;
+    declined: number;
+    revisit: number;
+    withdrawn: number;
+    tagged: number;
+  };
+  interviewees: IntervieweeCard[];
+  taxonomy: TaxonomyGroup[];
+  reminder: string;
 }
 
-interface AuthFormState {
-  level: string;
-  method: string;
-  person: string;
-  restriction: string;
+interface IntervieweeForm {
+  name: string;
+  authStatus: string;
+  authMethod: string;
+  authNote: string;
+  affiliations: TopicAffiliation[];
 }
 
-const AUTH_OPTIONS = [
-  { value: "archive", label: "仅存档", icon: "🔒", desc: "只给项目组保存，不展示" },
-  { value: "village", label: "村内可见", icon: "🔓", desc: "可在村图书馆、村内活动中使用" },
-  { value: "public", label: "可对外分享", icon: "📢", desc: "可用于展板、文章、网页或对外分享" },
+const DEFAULT_TAXONOMY: TaxonomyGroup[] = [
+  { code: "01", primary: "建筑与空间", secondary: ["宗祠", "庙宇", "老宅", "桥梁", "水井", "古道", "学校", "集市", "公共空间"] },
+  { code: "02", primary: "地理与地标", secondary: ["山川", "水系", "田地", "道路", "村落边界", "老地名", "自然地标"] },
+  { code: "03", primary: "宗族与家族", secondary: ["姓氏来源", "宗祠文化", "族谱", "迁徙", "家族关系", "祖先故事"] },
+  { code: "04", primary: "民俗与节庆", secondary: ["春节", "清明", "端午", "中秋", "婚俗", "丧葬", "祭祀", "成年礼", "地方节庆"] },
+  { code: "05", primary: "信仰与仪式", secondary: ["神祇", "祭祖", "庙会", "禁忌", "祈福", "仪式空间", "民间信仰"] },
+  { code: "06", primary: "生产与生计", secondary: ["农耕", "渔业", "手工业", "商贸", "传统职业", "工具", "集市"] },
+  { code: "07", primary: "饮食与物产", secondary: ["家常菜", "节庆食品", "地方特产", "制作技艺", "食材", "宴席"] },
+  { code: "08", primary: "日常生活", secondary: ["衣着", "住房", "出行", "用水", "照明", "购物", "娱乐", "家庭生活"] },
+  { code: "09", primary: "儿童与教育", secondary: ["学校", "读书", "游戏", "童谣", "劳动", "成长", "家庭教育"] },
+  { code: "10", primary: "人物与人生", secondary: ["村中老人", "手艺人", "教师", "干部", "商人", "普通家庭", "特殊人物"] },
+  { code: "11", primary: "村庄事件", secondary: ["建村", "灾害", "修路", "建桥", "建校", "集体活动", "社会变迁"] },
+  { code: "12", primary: "语言与口述文化", secondary: ["方言词", "俗语", "谚语", "童谣", "歌谣", "称谓", "地名读音"] },
+  { code: "13", primary: "手艺与物质文化", secondary: ["木工", "石雕", "编织", "农具", "服饰", "器物", "建筑技艺"] },
+  { code: "14", primary: "故事与传说", secondary: ["地方传说", "人物轶事", "地名故事", "神话", "怪谈", "家族故事"] },
+  { code: "15", primary: "村庄变迁", secondary: ["人口", "迁徙", "产业", "建筑", "交通", "环境", "生活方式"] },
+  { code: "16", primary: "社区关系", secondary: ["邻里互助", "宗族关系", "公共事务", "集体劳动", "女性角色"] },
 ];
 
-const METHOD_OPTIONS = [
-  { value: "verbal", label: "口述" },
-  { value: "written", label: "书面" },
-  { value: "other", label: "其他" },
+const AUTH_STATUS_OPTIONS = [
+  { value: "pending", label: "待确认", color: "bg-stone-100 text-stone-600", icon: Clock },
+  { value: "agreed", label: "已同意", color: "bg-green-50 text-green-700", icon: ShieldCheck },
+  { value: "declined", label: "不同意", color: "bg-red-50 text-red-600", icon: CircleAlert },
+  { value: "revisit", label: "需回访确认", color: "bg-amber-50 text-amber-700", icon: RotateCcw },
+  { value: "withdrawn", label: "已撤回", color: "bg-stone-100 text-stone-500", icon: CircleAlert },
 ];
 
-const normalizeMethod = (method?: string | null) => {
-  if (!method) return "verbal";
-  if (method.includes("书面") || method === "written") return "written";
-  if (method.includes("其他") || method === "other") return "other";
-  return "verbal";
+const AUTH_METHOD_OPTIONS = [
+  { value: "verbal", label: "口述确认" },
+  { value: "written", label: "书面确认" },
+  { value: "family_proxy", label: "家属代确认" },
+  { value: "other", label: "其他方式" },
+];
+
+const statusInfo = (status: string) =>
+  AUTH_STATUS_OPTIONS.find((item) => item.value === status) || AUTH_STATUS_OPTIONS[0];
+
+const methodLabel = (method?: string | null) =>
+  AUTH_METHOD_OPTIONS.find((item) => item.value === method)?.label || "待补充";
+
+const affiliationKey = (item: TopicAffiliation) => `${item.primary}::${item.secondary}`;
+
+const hasAffiliation = (items: TopicAffiliation[], target: TopicAffiliation) =>
+  items.some((item) => affiliationKey(item) === affiliationKey(target));
+
+const toggleAffiliation = (items: TopicAffiliation[], target: TopicAffiliation) =>
+  hasAffiliation(items, target)
+    ? items.filter((item) => affiliationKey(item) !== affiliationKey(target))
+    : [...items, target];
+
+const affiliationText = (items: TopicAffiliation[]) => {
+  if (items.length === 0) return "待标注";
+  return items.map((item) => item.secondary).join("、");
 };
 
 const AuthorizationPage = () => {
@@ -91,8 +137,8 @@ const AuthorizationPage = () => {
   const [authData, setAuthData] = useState<AuthListData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
-  const [expandedSub, setExpandedSub] = useState<string | null>(null);
-  const [formState, setFormState] = useState<Record<string, AuthFormState>>({});
+  const [expandedPerson, setExpandedPerson] = useState<string | null>(null);
+  const [formState, setFormState] = useState<Record<string, IntervieweeForm>>({});
 
   const fetchAuthList = useCallback(async () => {
     if (!topicId) return;
@@ -102,9 +148,7 @@ const AuthorizationPage = () => {
         url: `/api/topics/${topicId}/auth-list`,
       });
       const data = res.data?.data;
-      if (data) {
-        setAuthData(data);
-      }
+      if (data) setAuthData(data);
     } catch (err) {
       console.error("获取授权列表失败:", err);
       Taro.showToast({ title: "加载失败", icon: "none" });
@@ -117,72 +161,146 @@ const AuthorizationPage = () => {
     fetchAuthList();
   });
 
-  const getForm = (sub: SubtopicAuthItem): AuthFormState => {
+  const getForm = (person: IntervieweeCard): IntervieweeForm => {
     return (
-      formState[sub.id] || {
-        level: sub.auth_level !== "not_set" ? sub.auth_level : "village",
-        method: normalizeMethod(sub.auth_method),
-        person: sub.auth_person || sub.interviewees?.[0]?.name || "",
-        restriction: sub.auth_restriction || "",
+      formState[person.id] || {
+        name: person.name || "",
+        authStatus: person.auth_status || "pending",
+        authMethod: person.auth_method || "verbal",
+        authNote: person.auth_note || "",
+        affiliations:
+          person.topic_affiliations?.length > 0
+            ? person.topic_affiliations
+            : person.suggested_affiliations || [],
       }
     );
   };
 
-  const updateForm = (subId: string, patch: Partial<AuthFormState>) => {
-    const sub = authData?.subtopics.find((item) => item.id === subId);
-    if (!sub) return;
+  const updateForm = (personId: string, patch: Partial<IntervieweeForm>) => {
+    const person = authData?.interviewees.find((item) => item.id === personId);
+    if (!person) return;
     setFormState((current) => ({
       ...current,
-      [subId]: {
-        ...getForm(sub),
+      [personId]: {
+        ...getForm(person),
         ...patch,
       },
     }));
   };
 
-  const handleSetAuth = async (sub: SubtopicAuthItem) => {
-    const form = getForm(sub);
-    if (!form.person.trim()) {
-      Taro.showToast({ title: "请填写授权人", icon: "none" });
+  const handleSave = async (person: IntervieweeCard) => {
+    const form = getForm(person);
+    if (!form.name.trim()) {
+      Taro.showToast({ title: "请填写受访人姓名", icon: "none" });
       return;
     }
 
     try {
-      setSaving(sub.id);
+      setSaving(person.id);
       const res = await Network.request({
-        url: `/api/topics/${topicId}/subtopics/${sub.id}/auth`,
+        url: `/api/topics/${topicId}/interviewees/${person.id}/authorization`,
         method: "POST",
         data: {
-          auth_level: form.level,
-          auth_method: form.method,
-          auth_person: form.person.trim(),
-          restriction: form.restriction.trim(),
+          name: form.name.trim(),
+          auth_status: form.authStatus,
+          auth_method: form.authMethod,
+          auth_note: form.authNote.trim(),
+          topic_affiliations: form.affiliations,
         },
       });
+
       if (res.data?.data) {
-        Taro.showToast({ title: "授权已保存", icon: "success" });
-        setExpandedSub(res.data.data.next_subtopic_id || null);
+        Taro.showToast({ title: "已保存", icon: "success" });
+        setExpandedPerson(res.data.data.next_interviewee_id || null);
         fetchAuthList();
       }
     } catch (err) {
-      console.error("设置授权失败:", err);
+      console.error("保存授权状态失败:", err);
       Taro.showToast({ title: "保存失败，请重试", icon: "none" });
     } finally {
       setSaving(null);
     }
   };
 
-  const toggleExpand = (subId: string) => {
-    setExpandedSub(expandedSub === subId ? null : subId);
+  const renderStatusPicker = (person: IntervieweeCard) => {
+    const form = getForm(person);
+    return (
+      <View className="grid grid-cols-2 gap-2">
+        {AUTH_STATUS_OPTIONS.map((option) => {
+          const selected = form.authStatus === option.value;
+          return (
+            <Button
+              key={option.value}
+              size="sm"
+              variant={selected ? "default" : "outline"}
+              className="justify-start"
+              onClick={() => updateForm(person.id, { authStatus: option.value })}
+            >
+              <Text>{selected ? "✓ " : ""}{option.label}</Text>
+            </Button>
+          );
+        })}
+      </View>
+    );
+  };
+
+  const renderMethodPicker = (person: IntervieweeCard) => {
+    const form = getForm(person);
+    return (
+      <View className="flex flex-wrap gap-2">
+        {AUTH_METHOD_OPTIONS.map((option) => (
+          <Button
+            key={option.value}
+            size="sm"
+            variant={form.authMethod === option.value ? "default" : "outline"}
+            onClick={() => updateForm(person.id, { authMethod: option.value })}
+          >
+            <Text>{option.label}</Text>
+          </Button>
+        ))}
+      </View>
+    );
+  };
+
+  const renderAffiliationPicker = (person: IntervieweeCard, taxonomy: TaxonomyGroup[]) => {
+    const form = getForm(person);
+    return (
+      <View className="space-y-3">
+        {taxonomy.map((group) => (
+          <View key={group.code} className="bg-stone-50 rounded-lg p-3">
+            <Text className="block text-xs font-semibold text-stone-700 mb-2">
+              {group.code} {group.primary}
+            </Text>
+            <View className="flex flex-wrap gap-2">
+              {group.secondary.map((secondary) => {
+                const affiliation = { primary: group.primary, secondary };
+                const selected = hasAffiliation(form.affiliations, affiliation);
+                return (
+                  <Button
+                    key={`${group.primary}-${secondary}`}
+                    size="sm"
+                    variant={selected ? "default" : "outline"}
+                    onClick={() =>
+                      updateForm(person.id, {
+                        affiliations: toggleAffiliation(form.affiliations, affiliation),
+                      })
+                    }
+                  >
+                    <Text>{secondary}</Text>
+                  </Button>
+                );
+              })}
+            </View>
+          </View>
+        ))}
+      </View>
+    );
   };
 
   if (loading) {
     return (
       <View className="min-h-screen bg-background p-4">
-        <View className="mb-6">
-          <Skeleton className="h-8 w-48 mb-2" />
-          <Skeleton className="h-4 w-64" />
-        </View>
+        <Skeleton className="h-8 w-48 mb-4" />
         {[1, 2, 3].map((i) => (
           <Card key={i} className="mb-3">
             <CardContent className="p-4">
@@ -206,10 +324,9 @@ const AuthorizationPage = () => {
     );
   }
 
-  const subs = authData.subtopics;
+  const taxonomy = authData.taxonomy?.length ? authData.taxonomy : DEFAULT_TAXONOMY;
   const interviewees = authData.interviewees || [];
-  const authedCount = subs.filter((s) => s.auth_level !== "not_set").length;
-  const totalCount = subs.length;
+  const taggedCount = interviewees.filter((person) => person.topic_affiliations.length > 0).length;
 
   return (
     <View className="min-h-screen bg-background pb-8">
@@ -223,252 +340,187 @@ const AuthorizationPage = () => {
         </Text>
         <View className="flex items-center justify-between">
           <Text className="block text-amber-100 text-xs">
-            已确认 {authedCount}/{totalCount} 个子话题
+            已同意 {authData.stats.agreed}/{authData.stats.total} 人
           </Text>
-          <Text className="block text-amber-100 text-xs">老人以后可以修改授权</Text>
+          <Text className="block text-amber-100 text-xs">
+            已标注 {taggedCount}/{authData.stats.total} 人
+          </Text>
         </View>
       </View>
 
       <View className="px-4 -mt-3">
         <Card className="mb-4 border-amber-200 bg-amber-50">
           <CardContent className="p-3">
+            <Text className="block text-sm font-semibold text-amber-900 mb-1">
+              先看人，再看话题归属
+            </Text>
             <Text className="block text-xs text-amber-800 leading-relaxed">
-              请先让老人知道每段内容讲了什么，再逐段确认使用范围。授权状态和事实核实状态分开：可公开不代表已核实。
+              {authData.reminder || "授权管理以受访人为主：先确认人的授权状态，再标注这个人关联的一、二级话题。"}
             </Text>
           </CardContent>
         </Card>
 
-        {interviewees.length > 0 && (
-          <Card className="mb-4">
-            <CardContent className="p-4">
-              <View className="flex items-center mb-3">
-                <Users size={18} color="#92400E" className="mr-2" />
-                <Text className="block text-base font-semibold text-foreground">
-                  受访人概览
-                </Text>
-              </View>
-              <View className="space-y-3">
-                {interviewees.map((person) => (
-                  <View key={person.name} className="bg-stone-50 rounded-lg p-3">
-                    <View className="flex items-center justify-between mb-1">
-                      <View className="flex items-center">
-                        <UserRound size={16} color="#57534E" className="mr-1" />
-                        <Text className="text-sm font-semibold text-foreground">
-                          {person.name}
-                        </Text>
-                      </View>
-                      <Text className="text-xs text-amber-700">
-                        贡献 {person.claim_count} 条信息点
-                      </Text>
-                    </View>
-                    <Text className="block text-xs text-muted-foreground mb-2">
-                      {(person.age || "年龄待补充") +
-                        " / " +
-                        (person.occupation || person.role || "身份待补充")}
-                    </Text>
-                    <View className="flex flex-wrap gap-1">
-                      {((person.tags || []).length > 0 ? person.tags || [] : ["待补充标签"]).map(
-                        (tag) => (
-                          <Badge key={`${person.name}-${tag}`} variant="outline">
-                            <Text className="text-xs">{tag}</Text>
-                          </Badge>
-                        ),
-                      )}
-                    </View>
-                  </View>
-                ))}
-              </View>
+        <View className="grid grid-cols-2 gap-2 mb-4">
+          <Card>
+            <CardContent className="p-3">
+              <Text className="block text-lg font-bold text-stone-800">
+                {authData.stats.pending + authData.stats.revisit}
+              </Text>
+              <Text className="block text-xs text-muted-foreground">待确认/回访</Text>
             </CardContent>
           </Card>
-        )}
+          <Card>
+            <CardContent className="p-3">
+              <Text className="block text-lg font-bold text-stone-800">
+                {authData.stats.declined + authData.stats.withdrawn}
+              </Text>
+              <Text className="block text-xs text-muted-foreground">不同意/已撤回</Text>
+            </CardContent>
+          </Card>
+        </View>
 
-        {subs.map((sub) => {
-          const isExpanded = expandedSub === sub.id;
-          const currentAuth = AUTH_OPTIONS.find((o) => o.value === sub.auth_level);
-          const form = getForm(sub);
-          const pendingVerify = sub.pending_verify || [];
-          const riskWarnings = sub.risk_warnings || [];
-          const isPublicPending =
-            form.level === "public" && sub.verify_status === "pending";
+        {interviewees.length === 0 ? (
+          <Card>
+            <CardContent className="p-6">
+              <Text className="block text-sm text-muted-foreground text-center">
+                还没有受访人记录。采访内容整理完成后，会从整理文档里推导候选受访人；也可以后续新增受访人表。
+              </Text>
+            </CardContent>
+          </Card>
+        ) : (
+          <View className="space-y-3">
+            {interviewees.map((person) => {
+              const expanded = expandedPerson === person.id;
+              const form = getForm(person);
+              const info = statusInfo(form.authStatus);
+              const StatusIcon = info.icon;
+              const savedAffiliations = person.topic_affiliations || [];
+              const suggestions = person.suggested_affiliations || [];
 
-          return (
-            <Card key={sub.id} className="mb-3">
-              <CardContent className="p-4">
-                <View
-                  className="flex items-center justify-between mb-2"
-                  onClick={() => toggleExpand(sub.id)}
-                >
-                  <View className="flex items-center flex-1">
-                    <Text className="block text-xl mr-2">{sub.icon}</Text>
-                    <Text className="block text-base font-semibold text-foreground flex-1">
-                      {sub.name}
-                    </Text>
-                  </View>
-                  <Badge
-                    variant={
-                      sub.auth_level === "public"
-                        ? "default"
-                        : sub.auth_level === "village"
-                          ? "secondary"
-                          : "outline"
-                    }
-                  >
-                    <Text className="text-xs">
-                      {sub.auth_level_icon} {sub.auth_level_label}
-                    </Text>
-                  </Badge>
-                </View>
-
-                <View className="bg-stone-50 rounded-lg p-3 mb-3">
-                  <Text className="block text-xs text-muted-foreground mb-1">
-                    这段内容讲了：
-                  </Text>
-                  <Text className="block text-sm text-foreground leading-relaxed">
-                    {sub.content_summary}
-                  </Text>
-                </View>
-
-                <View className="bg-white rounded-lg border border-stone-100 p-3 mb-3">
-                  <View className="flex items-center mb-1">
-                    <FileText size={14} color="#78716C" className="mr-1" />
-                    <Text className="text-xs text-muted-foreground">
-                      信息来源：{sub.source_label}
-                    </Text>
-                  </View>
-                  <Text className="block text-xs text-stone-600 leading-relaxed">
-                    {sub.source_excerpt || "暂无采访整理文档摘录"}
-                  </Text>
-                </View>
-
-                {pendingVerify.length > 0 && (
-                  <View className="flex flex-wrap gap-1 mb-3">
-                    {pendingVerify.map((flag, i) => (
-                      <View
-                        key={i}
-                        className="flex items-center bg-amber-100 rounded-full px-2 py-1"
-                      >
-                        <TriangleAlert size={12} color="#B45309" className="mr-1" />
-                        <Text className="text-xs text-amber-800">
-                          {flag.replace("⚠️ 待核实：", "")}
-                        </Text>
+              return (
+                <Card key={person.id}>
+                  <CardContent className="p-4">
+                    <View
+                      className="flex items-start justify-between"
+                      onClick={() => setExpandedPerson(expanded ? null : person.id)}
+                    >
+                      <View className="flex items-start flex-1">
+                        <View className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center mr-3">
+                          <UserRound size={20} color="#92400E" />
+                        </View>
+                        <View className="flex-1">
+                          <View className="flex items-center mb-1">
+                            <Text className="block text-base font-semibold text-foreground mr-2">
+                              {person.name}
+                            </Text>
+                            {person.is_temporary && (
+                              <Badge variant="outline">
+                                <Text className="text-xs">待建档</Text>
+                              </Badge>
+                            )}
+                          </View>
+                          <Text className="block text-xs text-muted-foreground">
+                            {(person.age || "年龄待补充") +
+                              " / " +
+                              (person.occupation || person.role || "身份待补充")}
+                          </Text>
+                        </View>
                       </View>
-                    ))}
-                  </View>
-                )}
+                      <Badge className={info.color}>
+                        <View className="flex items-center">
+                          <StatusIcon size={12} color="#57534E" className="mr-1" />
+                          <Text className="text-xs">{info.label}</Text>
+                        </View>
+                      </Badge>
+                    </View>
 
-                {riskWarnings.length > 0 && (
-                  <View className="bg-orange-50 rounded-lg p-3 mb-3">
-                    <View className="flex items-center mb-1">
-                      <Tags size={14} color="#C2410C" className="mr-1" />
-                      <Text className="text-xs font-medium text-orange-800">
-                        授权前提醒
+                    <View className="mt-3 bg-stone-50 rounded-lg p-3">
+                      <View className="flex items-center mb-1">
+                        <Tags size={14} color="#78716C" className="mr-1" />
+                        <Text className="text-xs text-muted-foreground">话题归属</Text>
+                      </View>
+                      <Text className="block text-sm text-stone-700 leading-relaxed">
+                        {affiliationText(savedAffiliations)}
                       </Text>
                     </View>
-                    {riskWarnings.map((warning) => (
-                      <Text
-                        key={warning}
-                        className="block text-xs text-orange-800 leading-relaxed"
+
+                    {person.source_summary && (
+                      <View className="mt-3 bg-white rounded-lg border border-stone-100 p-3">
+                        <View className="flex items-center mb-1">
+                          <FileText size={14} color="#78716C" className="mr-1" />
+                          <Text className="text-xs text-muted-foreground">
+                            整理文档线索：{person.source_count} 条
+                          </Text>
+                        </View>
+                        <Text className="block text-xs text-stone-600 leading-relaxed">
+                          {person.source_summary}
+                        </Text>
+                      </View>
+                    )}
+
+                    {suggestions.length > 0 && savedAffiliations.length === 0 && (
+                      <View className="mt-3 bg-amber-50 rounded-lg p-3">
+                        <Text className="block text-xs text-amber-800 mb-1">
+                          系统建议标注：
+                        </Text>
+                        <Text className="block text-xs text-amber-800 leading-relaxed">
+                          {affiliationText(suggestions)}
+                        </Text>
+                      </View>
+                    )}
+
+                    <View className="mt-3 flex items-center justify-between">
+                      <Text className="text-xs text-muted-foreground">
+                        授权方式：{methodLabel(person.auth_method)}
+                      </Text>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-amber-700"
+                        onClick={() => setExpandedPerson(expanded ? null : person.id)}
                       >
-                        - {warning}
-                      </Text>
-                    ))}
-                  </View>
-                )}
+                        <Text>{expanded ? "收起" : "编辑"}</Text>
+                      </Button>
+                    </View>
 
-                {sub.can_auth ? (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="mb-2 w-full justify-center text-amber-700"
-                      onClick={() => toggleExpand(sub.id)}
-                    >
-                      <Text className="text-sm text-amber-700">
-                        {isExpanded ? "收起" : currentAuth ? "修改授权" : "设置授权"}
-                      </Text>
-                    </Button>
+                    {expanded && (
+                      <View className="mt-4 space-y-4">
+                        <Separator />
 
-                    {isExpanded && (
-                      <View className="space-y-3 mt-2">
                         <View>
                           <Text className="block text-xs font-medium text-stone-700 mb-2">
-                            授权级别
+                            受访人姓名
                           </Text>
-                          <View className="space-y-2">
-                            {AUTH_OPTIONS.map((option) => {
-                              const isSelected = form.level === option.value;
-                              return (
-                                <Button
-                                  key={option.value}
-                                  variant={isSelected ? "default" : "outline"}
-                                  size="sm"
-                                  className="w-full justify-start"
-                                  onClick={() =>
-                                    updateForm(sub.id, { level: option.value })
-                                  }
-                                >
-                                  <View className="flex items-center w-full">
-                                    <Text className="text-lg mr-2">
-                                      {option.icon}
-                                    </Text>
-                                    <View className="flex-1">
-                                      <Text className="block text-sm font-medium text-foreground">
-                                        {option.label}
-                                      </Text>
-                                      <Text className="block text-xs text-muted-foreground">
-                                        {option.desc}
-                                      </Text>
-                                    </View>
-                                    {isSelected && <Check size={16} color="#B45309" />}
-                                  </View>
-                                </Button>
-                              );
-                            })}
-                          </View>
+                          <Input
+                            value={form.name}
+                            placeholder="例如：陈爷爷"
+                            onInput={(event) =>
+                              updateForm(person.id, {
+                                name: String(event.detail.value || ""),
+                              })
+                            }
+                          />
                         </View>
 
-                        {isPublicPending && (
-                          <View className="bg-red-50 rounded-lg p-3">
-                            <Text className="block text-xs text-red-700 leading-relaxed">
-                              这段可以获得公开授权，但仍有待核实信息。公开时不能写成已核实事实。
-                            </Text>
-                          </View>
-                        )}
+                        <View>
+                          <Text className="block text-xs font-medium text-stone-700 mb-2">
+                            授权状态
+                          </Text>
+                          {renderStatusPicker(person)}
+                        </View>
 
                         <View>
                           <Text className="block text-xs font-medium text-stone-700 mb-2">
                             授权方式
                           </Text>
-                          <View className="flex gap-2">
-                            {METHOD_OPTIONS.map((option) => (
-                              <Button
-                                key={option.value}
-                                variant={form.method === option.value ? "default" : "outline"}
-                                size="sm"
-                                className="flex-1"
-                                onClick={() =>
-                                  updateForm(sub.id, { method: option.value })
-                                }
-                              >
-                                <Text>{option.label}</Text>
-                              </Button>
-                            ))}
-                          </View>
+                          {renderMethodPicker(person)}
                         </View>
 
                         <View>
                           <Text className="block text-xs font-medium text-stone-700 mb-2">
-                            授权人
+                            话题归属
                           </Text>
-                          <Input
-                            value={form.person}
-                            placeholder="例如：陈爷爷"
-                            onInput={(event) =>
-                              updateForm(sub.id, {
-                                person: String(event.detail.value || ""),
-                              })
-                            }
-                          />
+                          {renderAffiliationPicker(person, taxonomy)}
                         </View>
 
                         <View>
@@ -476,86 +528,53 @@ const AuthorizationPage = () => {
                             特殊要求
                           </Text>
                           <Textarea
-                            value={form.restriction}
-                            placeholder="例如：可以公开，但不要写家人的真实姓名。"
+                            value={form.authNote}
+                            placeholder="例如：可以用于项目材料；公开时不要写家人的真实姓名。"
                             className="h-24"
                             onInput={(event) =>
-                              updateForm(sub.id, {
-                                restriction: String(event.detail.value || ""),
+                              updateForm(person.id, {
+                                authNote: String(event.detail.value || ""),
                               })
                             }
                           />
                         </View>
 
+                        <View className="bg-stone-50 rounded-lg p-3">
+                          <View className="flex items-center">
+                            <Check size={14} color="#166534" className="mr-1" />
+                            <Text className="text-xs text-stone-700">
+                              将保存：{form.name || "未命名受访人"} / {statusInfo(form.authStatus).label} / {affiliationText(form.affiliations)}
+                            </Text>
+                          </View>
+                        </View>
+
                         <Button
                           className="w-full bg-amber-700 text-white"
-                          disabled={saving === sub.id}
-                          onClick={() => handleSetAuth(sub)}
+                          disabled={saving === person.id}
+                          onClick={() => handleSave(person)}
                         >
-                          <Text>{saving === sub.id ? "保存中..." : "保存授权"}</Text>
+                          <Text>{saving === person.id ? "保存中..." : "保存授权状态和话题归属"}</Text>
                         </Button>
 
-                        {sub.auth_time && (
-                          <>
-                            <Separator className="my-2" />
-                            <View className="bg-green-50 rounded-lg p-2">
-                              <Text className="block text-xs text-green-800">
-                                上次授权：{sub.auth_level_icon} {sub.auth_level_label}
-                                {sub.auth_method ? ` | ${sub.auth_method}` : ""}
+                        {person.confirmed_at && (
+                          <View className="bg-green-50 rounded-lg p-2">
+                            <Text className="block text-xs text-green-800">
+                              最近确认：{person.auth_status_label} / {person.auth_method_label || "方式待补充"}
+                            </Text>
+                            {person.auth_note && (
+                              <Text className="block text-xs text-green-700 mt-1">
+                                特殊要求：{person.auth_note}
                               </Text>
-                              {sub.auth_restriction && (
-                                <Text className="block text-xs text-green-700 mt-1">
-                                  特殊要求：{sub.auth_restriction}
-                                </Text>
-                              )}
-                              <Text className="block text-xs text-green-600 mt-1">
-                                老人以后可以修改授权
-                              </Text>
-                            </View>
-                          </>
+                            )}
+                          </View>
                         )}
                       </View>
                     )}
-                  </>
-                ) : (
-                  <View className="bg-stone-100 rounded-lg p-3">
-                    <Text className="block text-xs text-muted-foreground text-center">
-                      该子话题还没有整理好的采访内容，采访内容整理完成后可设置授权
-                    </Text>
-                  </View>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-
-        {totalCount > 0 && (
-          <Card className="mt-4 border-amber-200 bg-amber-50">
-            <CardContent className="p-4">
-              <Text className="block text-sm font-semibold text-amber-900 mb-2">
-                授权总览
-              </Text>
-              <View className="flex flex-wrap gap-2">
-                {subs.map((sub) => (
-                  <View
-                    key={sub.id}
-                    className="flex items-center bg-white rounded-full px-3 py-1"
-                  >
-                    <Text className="text-sm mr-1">{sub.icon}</Text>
-                    <Text className="text-xs text-foreground mr-1">{sub.name}</Text>
-                    <Text className="text-xs">{sub.auth_level_icon}</Text>
-                  </View>
-                ))}
-              </View>
-              {authedCount === totalCount && totalCount > 0 && (
-                <View className="mt-3 bg-green-100 rounded-lg p-2">
-                  <Text className="block text-xs text-green-800 text-center">
-                    全部授权确认完毕，可以进入对应的存档或展示范围。
-                  </Text>
-                </View>
-              )}
-            </CardContent>
-          </Card>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </View>
         )}
       </View>
     </View>

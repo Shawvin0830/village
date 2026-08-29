@@ -1,11 +1,14 @@
 /**
- * 采访策划师 Skill — 专业化采访策划
+ * 采访策划师 Skill — 专业化采访策划（V2 框架版）
+ *
+ * 基于 Village Memory Interview Skill V0.1
  *
  * 核心能力：
- * 1. 语境分析：综合已有资料，识别知识空白点
- * 2. 双版本问题生成：大人备用版（深度追问）+ 孩子执行版（简单口语）
- * 3. 追问锦囊：应对偏题、专有名词、新发现等场景
- * 4. 避免重复：基于已有采访记录，不重复已覆盖的内容
+ * 1. 10维度镜头（Interview Lens）：根据话题选取最相关的5-8个维度
+ * 2. 三层问题结构：热身（2-3个）→ 核心（6-10个，按维度组织）→ 收尾（2-3个）
+ * 3. 双版本设计：每个核心问题含大人备用版 + 小孩执行版
+ * 4. 追问锦囊：6类追问（人物/时间/地点/做法/变化/方言）+ 3种特殊场景
+ * 5. 避免重复：基于已有采访记录，不重复已覆盖的内容
  */
 import { Injectable } from '@nestjs/common';
 import { LLMClient, Config } from 'coze-coding-dev-sdk';
@@ -23,37 +26,118 @@ export class InterviewPlannerSkill {
 
   /**
    * 生成专业采访策划
-   * 包含：语境摘要、大人版问题、孩子版问题、追问锦囊
    */
   async generate(topicId: string) {
-    // 1. 收集上下文
     const context = await this.collectContext(topicId);
-
-    // 2. 调用 LLM 生成策划
     const plan = await this.generatePlan(context);
 
-    // 3. 保存到数据库
     const { data: savedPlan, error } = await this.client
       .from('interview_plans')
       .insert({
         topic_id: topicId,
         context_summary: plan.context_summary,
-        adult_questions: plan.adult_questions,
-        child_questions: plan.child_questions,
-        tips: plan.tips,
+        adult_questions: plan.selected_dimensions,
+        child_questions: plan.warmup_questions,
+        tips: {
+          core_questions: plan.core_questions,
+          closing_questions: plan.closing_questions,
+          tips: plan.tips,
+        },
+        status: 'draft',
       })
       .select()
       .single();
 
     if (error) throw new Error(`保存采访策划失败: ${error.message}`);
-    return savedPlan;
+
+    // 返回完整结构
+    return {
+      ...savedPlan,
+      selected_dimensions: plan.selected_dimensions,
+      warmup_questions: plan.warmup_questions,
+      core_questions: plan.core_questions,
+      closing_questions: plan.closing_questions,
+      tips: plan.tips,
+    };
+  }
+
+  /**
+   * 基于已有策划 + 用户反馈迭代优化
+   */
+  async refine(planId: string, feedback: string) {
+    const { data: existingPlan, error: planError } = await this.client
+      .from('interview_plans')
+      .select('*')
+      .eq('id', planId)
+      .single();
+
+    if (planError || !existingPlan) throw new Error('策划不存在');
+
+    const context = await this.collectContext(existingPlan.topic_id);
+    const refined = await this.refinePlan(context, existingPlan, feedback);
+
+    const { data: updatedPlan, error: updateError } = await this.client
+      .from('interview_plans')
+      .update({
+        context_summary: refined.context_summary,
+        adult_questions: refined.selected_dimensions,
+        child_questions: refined.warmup_questions,
+        tips: {
+          core_questions: refined.core_questions,
+          closing_questions: refined.closing_questions,
+          tips: refined.tips,
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', planId)
+      .select()
+      .single();
+
+    if (updateError) throw new Error(`更新采访策划失败: ${updateError.message}`);
+
+    return {
+      ...updatedPlan,
+      selected_dimensions: refined.selected_dimensions,
+      warmup_questions: refined.warmup_questions,
+      core_questions: refined.core_questions,
+      closing_questions: refined.closing_questions,
+      tips: refined.tips,
+    };
+  }
+
+  /**
+   * 确认定稿
+   */
+  async finalize(planId: string) {
+    const { data, error } = await this.client
+      .from('interview_plans')
+      .update({ status: 'final', updated_at: new Date().toISOString() })
+      .eq('id', planId)
+      .select()
+      .single();
+
+    if (error) throw new Error(`确认定稿失败: ${error.message}`);
+    return data;
+  }
+
+  /**
+   * 获取话题的最新策划
+   */
+  async getByTopic(topicId: string) {
+    const { data, error } = await this.client
+      .from('interview_plans')
+      .select('*')
+      .eq('topic_id', topicId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (error) throw new Error(`查询采访策划失败: ${error.message}`);
+    return data?.[0] || null;
   }
 
   /**
    * 收集话题的完整上下文
    */
   private async collectContext(topicId: string) {
-    // 话题基本信息
     const { data: topic } = await this.client
       .from('topics')
       .select('id, name, description')
@@ -62,28 +146,24 @@ export class InterviewPlannerSkill {
 
     if (!topic) throw new Error('话题不存在');
 
-    // 已有子话题
     const { data: subtopics } = await this.client
       .from('subtopics')
       .select('id, name, icon, transcript_status, summary')
       .eq('topic_id', topicId);
 
-    // 已有采访记录
     const { data: records } = await this.client
       .from('interview_records')
       .select('transcript_text, dialect_original, mandarin_text, ai_analysis')
       .eq('topic_id', topicId)
       .eq('status', 'completed');
 
-    // 已有策划
     const { data: existingPlans } = await this.client
       .from('interview_plans')
-      .select('context_summary, adult_questions, child_questions')
+      .select('context_summary, adult_questions, child_questions, tips')
       .eq('topic_id', topicId)
       .order('created_at', { ascending: false })
       .limit(1);
 
-    // 已有资料（用户录入 + AI搜索）
     const { data: materials } = await this.client
       .from('reference_materials')
       .select('id, source, title, content, tags, url')
@@ -100,7 +180,26 @@ export class InterviewPlannerSkill {
   }
 
   /**
-   * 调用 LLM 生成采访策划
+   * 10维度框架定义（传给 LLM 的参考）
+   */
+  private get dimensionsReference() {
+    return `
+| 维度 | 英文 | 问什么 | 什么时候选 |
+|------|------|--------|-----------|
+| 🌱 起源 | Origin | 东西从哪来、怎么开始的 | 主题涉及建筑/宗族/习俗时必选 |
+| 👤 人物 | People | 谁做的、谁管的、谁变了 | 几乎所有主题都涉及 |
+| 📍 地点 | Place | 在哪、叫什么、还在吗 | 主题涉及建筑/地理/空间时必选 |
+| 🔧 做法 | Practice | 具体怎么做、步骤是什么 | 主题涉及习俗/手艺/生计时必选 |
+| 🏺 物件 | Object | 用什么、什么材料、现在还有吗 | 主题涉及建筑/手艺/饮食时选 |
+| 📜 规则 | Rule | 有什么讲究、禁忌、不能做的 | 主题涉及习俗/信仰/宗族时选 |
+| 🧠 个人记忆 | Memory | 您亲历的、您记得的 | **永远必选** |
+| 🔄 变化 | Change | 以前和现在有什么不同 | **永远必选** |
+| 💡 意义 | Meaning | 对您来说意味着什么 | 收尾时用 |
+| 🔁 传承 | Transmission | 谁接着做、还会不会继续 | 主题涉及手艺/习俗/方言时选 |`;
+  }
+
+  /**
+   * 调用 LLM 生成采访策划（V2 框架）
    */
   private async generatePlan(context: Awaited<ReturnType<InterviewPlannerSkill['collectContext']>>) {
     const { topic, subtopics, records, existingPlan, materials } = context;
@@ -134,40 +233,97 @@ export class InterviewPlannerSkill {
 
     const systemPrompt = `你叫"村庄记忆"的采访策划师，是一个专业的文化记录顾问。
 
-你的任务是帮用户准备一次高质量的采访。你要像一个经验丰富的田野调查专家一样思考。
+你的任务是帮用户准备一次高质量的村庄记忆采访。你要像一个经验丰富的田野调查专家一样思考。
+
+## 10维度采访镜头（Interview Lens）
+
+一次完整的采访，需要从以下10个视角中选取最相关的5-8个。不要全部覆盖——根据主题选最相关的，像调镜头一样，远近高低各不同。
+
+${this.dimensionsReference}
+
+## 问题分层结构
+
+### 热身问题（2-3个）
+让老人放松，知道"我随便聊聊就行"。不要一上来就问大问题。
+适用所有采访的通用热身：
+- "您在这村住了多少年了？"
+- "您小时候这个村子什么样？"
+- "您跟这个[主题对象]有什么关系？"
+
+### 核心问题（6-10个，按维度组织）
+每个核心问题必须包含：
+- **dimension**: 维度标签（如 "🌱 起源"）
+- **dimension_key**: 维度英文key（如 "origin"）
+- **adult_version**: 大人备用版——项目负责人心里有数就行，可以自然插话追问
+- **child_version**: 小孩执行版——孩子能直接说出来，口语化，不超过1句话
+- **why_ask**: 为什么问这个——让采访者理解这个问题在找什么
+- **follow_up**: 追问方向——老人说到哪，就往哪个方向跟
+
+### 收尾问题（2-3个）
+意义 + 传承 + 寄语，用于收尾：
+- "这个[主题]对您来说意味着什么？"
+- "您觉得这个以后还会在吗？"
+- "有什么话想跟我们这些后辈说的？"
+
+## 追问锦囊
+
+分为6类常规追问 + 3种特殊场景：
+
+6类常规追问（根据本次采访涉及的维度选择相关的）：
+- 👤 人物追问：老人提到具体的人时
+- ⏰ 时间追问：老人提到时间时
+- 📍 地点追问：老人提到地点时
+- 🔧 做法追问：老人讲到某件事的过程时
+- 🔄 变化追问：老人说"不一样了"时
+- 🗣️ 方言追问：老人说了方言词时
+
+3种特殊场景（必选）：
+- 老人说了一个你没听过的东西 → "这个是什么？能再讲讲吗？"
+- 老人讲得很有意思但偏题了 → "这个太有趣了！那我们刚才说的那个呢？"
+- 老人说了一个专有名词 → "这个词是什么意思？" → 专有名词=文化密码，千万别跳过
 
 ## 核心原则
 
 1. **贴近生活**：问题要贴近老人的日常生活经验，不要太学术化
-2. **双版本设计**：
-   - 大人版（5-8个）：深度追问，包含事实核查角度，帮木兰（项目负责人）把握方向
-   - 孩子版（3-5个）：简单口语化，8-12岁能理解和执行
-3. **避免重复**：如果已有采访记录，不要重复已覆盖的内容，要找到空白点
-4. **方言友好**：问题设计要考虑方言表达，避免需要精确术语才能回答的问题
-5. **追问锦囊要实用**：帮孩子应对采访中的真实场景
+2. **亲历 > 听说**：优先问"您自己经历过的"
+3. **避免重复**：如果已有采访记录，不要重复已覆盖的内容
+4. **方言友好**：问题设计要考虑方言表达
+5. **不给套路回答**：不问"有什么文化意义"，问"对您来说意味着什么"
+6. **禁忌**：不用"请介绍一下……"、"有什么文化价值"这类学术/考试用语
 
 ## 语境摘要要求
 
 语境摘要要包含三部分：
-- **已知信息**：这个话题我们已经知道什么（来自互联网常识和已有采访）
+- **已知信息**：这个话题我们已经知道什么
 - **已有资料**：图书馆/项目组已有的相关材料
 - **空白点**：还没人讲过的、还不清楚的、值得深挖的方向
-
-## 追问锦囊设计
-
-要覆盖以下场景：
-- 老人说了一个孩子没听过的东西 → 如何追问
-- 老人讲得很有意思但偏题了 → 如何拉回来
-- 老人说了一个专有名词/方言词 → 如何记录
-- 老人记忆模糊/不确定 → 如何处理
-- 老人情绪激动/感慨 → 如何回应
+- **推荐维度**：为什么选这些维度
 
 请严格按以下JSON格式返回，不要有任何其他内容：
 {
-  "context_summary": "语境摘要（包含已知信息、已有资料、空白点三部分）",
-  "adult_questions": ["大人备用版问题1", "问题2", ...],
-  "child_questions": ["小孩执行版问题1", "问题2", ...],
-  "tips": ["追问锦囊1（场景→应对方式）", "锦囊2", ...]
+  "context_summary": "语境摘要",
+  "selected_dimensions": ["🌱 起源", "👤 人物", ...],
+  "warmup_questions": ["热身问题1", "热身问题2", ...],
+  "core_questions": [
+    {
+      "dimension": "🌱 起源",
+      "dimension_key": "origin",
+      "adult_version": "大人版问题",
+      "child_version": "小孩版问题",
+      "why_ask": "为什么问这个",
+      "follow_up": "→ 追问方向1、→ 追问方向2"
+    }
+  ],
+  "closing_questions": ["收尾问题1", "收尾问题2", ...],
+  "tips": {
+    "people": ["人物追问1", ...],
+    "time": ["时间追问1", ...],
+    "place": ["地点追问1", ...],
+    "practice": ["做法追问1", ...],
+    "change": ["变化追问1", ...],
+    "dialect": ["方言追问1", ...],
+    "special": ["特殊场景追问1", ...]
+  }
 }`;
 
     const userPrompt = `## 话题信息
@@ -187,9 +343,12 @@ ${recordInfo ? recordInfo.substring(0, 1500) : '暂无已有采访记录'}
 ${existingPlanInfo}
 
 请为这个话题生成一份专业的采访策划。注意：
-1. 如果已有资料，请充分利用这些资料，找到还没覆盖的空白点
-2. 孩子版问题要足够简单，让8-12岁的孩子能直接问出口
-3. 追问锦囊要具体实用，给出场景和对应的应对话术`;
+1. 从10个维度中选取5-8个最相关的，不要全部覆盖
+2. 🧠 个人记忆 和 🔄 变化 永远必选
+3. 热身问题要针对这个话题定制，不要完全用通用模板
+4. 核心问题每个维度1-2个，总共6-10个
+5. 小孩版问题要足够简单，让8-12岁的孩子能直接问出口
+6. 追问锦囊要根据本次选取的维度，选择相关的追问类型`;
 
     const llmClient = this.getLLMClient();
     const response = await llmClient.invoke(
@@ -200,7 +359,6 @@ ${existingPlanInfo}
       { temperature: 0.7 },
     );
 
-    // 解析 JSON
     try {
       const content = response.content.trim();
       const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -209,93 +367,8 @@ ${existingPlanInfo}
       }
       throw new Error('无法提取 JSON');
     } catch {
-      return {
-        context_summary: response.content,
-        adult_questions: [
-          `请详细介绍${topic.name}的历史和现状`,
-          `${topic.name}最让您印象深刻的记忆是什么？`,
-          '这些年${topic.name}发生了什么变化？',
-          '有什么是年轻人可能不知道的？',
-        ],
-        child_questions: [
-          `爷爷/奶奶，您能给我讲讲${topic.name}吗？`,
-          '您小时候这个是什么样的？',
-          '有什么有趣的故事可以告诉我吗？',
-        ],
-        tips: [
-          '如果老人说了一个你没听过的东西 → "这个是什么？能再给我讲讲吗？"',
-          '如果老人讲偏题了 → "这个太有趣了！那我们刚才说的那个呢？"',
-          '如果老人说了方言词 → "这个词是什么意思？我记下来"',
-          '如果老人不确定 → "没关系，您记得多少说多少，我们慢慢聊"',
-        ],
-      };
+      return this.getFallbackPlan(topic.name);
     }
-  }
-
-  /**
-   * 基于已有策划 + 用户反馈迭代优化
-   */
-  async refine(planId: string, feedback: string) {
-    // 1. 获取已有策划
-    const { data: existingPlan, error: planError } = await this.client
-      .from('interview_plans')
-      .select('*')
-      .eq('id', planId)
-      .single();
-
-    if (planError || !existingPlan) throw new Error('策划不存在');
-
-    // 2. 收集话题上下文
-    const context = await this.collectContext(existingPlan.topic_id);
-
-    // 3. 调用 LLM 基于反馈迭代
-    const refined = await this.refinePlan(context, existingPlan, feedback);
-
-    // 4. 更新策划（覆盖式）
-    const { data: updatedPlan, error: updateError } = await this.client
-      .from('interview_plans')
-      .update({
-        context_summary: refined.context_summary,
-        adult_questions: refined.adult_questions,
-        child_questions: refined.child_questions,
-        tips: refined.tips,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', planId)
-      .select()
-      .single();
-
-    if (updateError) throw new Error(`更新采访策划失败: ${updateError.message}`);
-    return updatedPlan;
-  }
-
-  /**
-   * 确认定稿
-   */
-  async finalize(planId: string) {
-    const { data, error } = await this.client
-      .from('interview_plans')
-      .update({ status: 'final', updated_at: new Date().toISOString() })
-      .eq('id', planId)
-      .select()
-      .single();
-
-    if (error) throw new Error(`确认定稿失败: ${error.message}`);
-    return data;
-  }
-
-  /**
-   * 获取话题的最新策划
-   */
-  async getByTopic(topicId: string) {
-    const { data, error } = await this.client
-      .from('interview_plans')
-      .select('*')
-      .eq('topic_id', topicId)
-      .order('created_at', { ascending: false })
-      .limit(1);
-    if (error) throw new Error(`查询采访策划失败: ${error.message}`);
-    return data?.[0] || null;
   }
 
   /**
@@ -310,37 +383,45 @@ ${existingPlanInfo}
 
     const currentPlanInfo = `
 【语境摘要】${existingPlan.context_summary || '无'}
-【大人版问题】${JSON.stringify(existingPlan.adult_questions || [])}
-【孩子版问题】${JSON.stringify(existingPlan.child_questions || [])}
-【追问锦囊】${JSON.stringify(existingPlan.tips || [])}
+【选用维度】${JSON.stringify(existingPlan.adult_questions || [])}
+【热身问题】${JSON.stringify(existingPlan.child_questions || [])}
+【核心问题】${JSON.stringify(existingPlan.tips || {})}
 `;
 
-    const systemPrompt = `你叫"村庄记忆"的采访策划师，是一个专业的文化记录顾问。
-
-用户已经有一版采访策划，现在要根据反馈进行修改优化。
+    const systemPrompt = `你叫"村庄记忆"的采访策划师。用户已经有一版采访策划，现在要根据反馈进行修改优化。
 
 ## 核心原则
+1. 理解反馈意图：用户可能要求修改某个问题、调整维度、增删问题、改变语气等
+2. 保持整体质量：修改时保持其他部分的质量
+3. 遵循10维度框架：🌱起源 👤人物 📍地点 🔧做法 🏺物件 📜规则 🧠个人记忆 🔄变化 💡意义 🔁传承
+4. 三层结构：热身（2-3个）→ 核心（6-10个，按维度）→ 收尾（2-3个）
+5. 双版本设计：每个核心问题有大人版 + 小孩版
+6. 追问锦囊分6类+3特殊场景
 
-1. **理解反馈意图**：用户可能要求修改某个具体问题、调整方向、增删问题、改变语气等
-2. **保持整体质量**：修改时要保持其他部分的质量，不要因局部修改影响整体
-3. **贴近生活**：问题要贴近老人的日常生活经验，不要太学术化
-4. **双版本设计**：
-   - 大人版（5-8个）：深度追问，包含事实核查角度
-   - 孩子版（3-5个）：简单口语化，8-12岁能理解和执行
-5. **方言友好**：问题设计要考虑方言表达
-6. **追问锦囊要实用**
-
-请严格按以下JSON格式返回，不要有任何其他内容：
+请严格按以下JSON格式返回：
 {
   "context_summary": "更新后的语境摘要",
-  "adult_questions": ["大人备用版问题1", "问题2", ...],
-  "child_questions": ["小孩执行版问题1", "问题2", ...],
-  "tips": ["追问锦囊1", "锦囊2", ...]
+  "selected_dimensions": ["🌱 起源", ...],
+  "warmup_questions": ["热身问题1", ...],
+  "core_questions": [
+    {
+      "dimension": "🌱 起源",
+      "dimension_key": "origin",
+      "adult_version": "大人版",
+      "child_version": "小孩版",
+      "why_ask": "为什么问",
+      "follow_up": "追问方向"
+    }
+  ],
+  "closing_questions": ["收尾问题1", ...],
+  "tips": {
+    "people": [], "time": [], "place": [],
+    "practice": [], "change": [], "dialect": [], "special": []
+  }
 }`;
 
     const userPrompt = `## 话题信息
 话题名称：${topic.name}
-${topic.description ? `话题描述：${topic.description}` : ''}
 
 ## 当前策划
 ${currentPlanInfo}
@@ -359,7 +440,6 @@ ${feedback}
       { temperature: 0.7 },
     );
 
-    // 解析 JSON
     try {
       const content = response.content.trim();
       const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -368,13 +448,80 @@ ${feedback}
       }
       throw new Error('无法提取 JSON');
     } catch {
-      // 解析失败时，返回原策划 + 提示
       return {
         context_summary: existingPlan.context_summary,
-        adult_questions: existingPlan.adult_questions,
-        child_questions: existingPlan.child_questions,
+        selected_dimensions: existingPlan.adult_questions,
+        warmup_questions: existingPlan.child_questions,
+        core_questions: [],
+        closing_questions: [],
         tips: existingPlan.tips,
       };
     }
+  }
+
+  /**
+   * LLM 解析失败时的兜底方案
+   */
+  private getFallbackPlan(topicName: string) {
+    return {
+      context_summary: `已知信息：关于「${topicName}」的基础资料有限。\n空白点：需要深入了解老人的亲历记忆和具体细节。`,
+      selected_dimensions: ['🌱 起源', '👤 人物', '🧠 个人记忆', '🔄 变化', '💡 意义'],
+      warmup_questions: [
+        `您在这村住了多少年了？`,
+        `您小时候${topicName}是什么样子的？`,
+      ],
+      core_questions: [
+        {
+          dimension: '🌱 起源',
+          dimension_key: 'origin',
+          adult_version: `您知道${topicName}最初是怎么来的吗？是谁发起的？`,
+          child_version: `这个是谁造的呀？`,
+          why_ask: '起源故事往往是最有记忆价值的部分',
+          follow_up: '→ 人物、→ 时间、→ 说法冲突',
+        },
+        {
+          dimension: '👤 人物',
+          dimension_key: 'people',
+          adult_version: `以前${topicName}由谁负责？现在呢？`,
+          child_version: `以前谁管这个？现在谁管？`,
+          why_ask: '人物是线索——知道了人，就能追出更多故事',
+          follow_up: '→ 还有没有其他关键人物、→ 人物关系',
+        },
+        {
+          dimension: '🧠 个人记忆',
+          dimension_key: 'memory',
+          adult_version: `关于${topicName}，您印象最深的一件事是什么？`,
+          child_version: `您记得最清楚的一件事是什么？讲给我听？`,
+          why_ask: '让老人讲自己的故事——原话最珍贵',
+          follow_up: '→ 当时多大、→ 什么感觉、→ 现在想起什么感觉',
+        },
+        {
+          dimension: '🔄 变化',
+          dimension_key: 'change',
+          adult_version: `以前和现在最大的不一样是什么？大概什么时候开始变的？`,
+          child_version: `以前和现在哪里不一样？`,
+          why_ask: '变化线是老人最有话说的——每个变化背后都是一段历史',
+          follow_up: '→ 什么时候开始变的、→ 为什么变、→ 还有什么没变',
+        },
+      ],
+      closing_questions: [
+        `这个对您来说意味着什么？`,
+        `您觉得以后还会有人记得吗？`,
+        `有什么话想跟我们这些后辈说的？`,
+      ],
+      tips: {
+        people: ['"他/她是谁？" → 提到不认识的人时追问', '"您和他/她是什么关系？"'],
+        time: ['"您当时多大？" → 用年龄锚定比年代更准', '"是您小时候？还是您爸爸那时候？"'],
+        place: ['"这个地方现在还在吗？"', '"以前本地人叫这个什么？"'],
+        practice: ['"能不能从头到尾讲一遍？"', '"第一步是什么？然后呢？"'],
+        change: ['"以前和现在有什么不一样？"', '"大概从什么时候开始变的？"'],
+        dialect: ['"这个词用本地方言怎么说？"', '"能不能再说一遍？我跟着念一下"'],
+        special: [
+          '老人说了你没听过的东西 → "这个是什么？能再讲讲吗？"',
+          '老人偏题了 → "这个太有趣了！那我们刚才说的那个呢？"',
+          '老人说了专有名词 → "这个词是什么意思？" → 千万别跳过',
+        ],
+      },
+    };
   }
 }
