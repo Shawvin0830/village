@@ -14,6 +14,29 @@ export class MaterialsController {
   ) {}
 
   /**
+   * 获取所有资料（资料库 TabBar 页面使用）
+   */
+  @Get()
+  @HttpCode(200)
+  async findAll() {
+    const materials = await this.materialsService.findAll()
+    return { code: 200, msg: 'success', data: materials }
+  }
+
+  /**
+   * 全局关键词搜索资料（不限话题）
+   */
+  @Get('search')
+  @HttpCode(200)
+  async globalSearch(@Query('q') query: string) {
+    if (!query?.trim()) {
+      return { code: 200, msg: 'success', data: [] }
+    }
+    const materials = await this.materialsService.globalSearch(query.trim())
+    return { code: 200, msg: 'success', data: materials }
+  }
+
+  /**
    * 获取话题下的所有资料
    */
   @Get('topic/:topicId')

@@ -13,6 +13,40 @@ export class MaterialsService {
   }
 
   /**
+   * 获取所有资料（资料库 TabBar 页面使用）
+   */
+  async findAll() {
+    const { data, error } = await this.client
+      .from('reference_materials')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      this.logger.error(`Failed to fetch all materials: ${error.message}`)
+      return []
+    }
+    return data || []
+  }
+
+  /**
+   * 全局关键词搜索资料（不限话题）
+   */
+  async globalSearch(query: string) {
+    const { data, error } = await this.client
+      .from('reference_materials')
+      .select('*')
+      .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    if (error) {
+      this.logger.error(`Failed to global search materials: ${error.message}`)
+      return []
+    }
+    return data || []
+  }
+
+  /**
    * 获取话题下的所有资料
    */
   async findByTopic(topicId: string) {

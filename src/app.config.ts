@@ -26,7 +26,7 @@ export default defineAppConfig({
     list: [
       {
         pagePath: 'pages/index/index',
-        text: '首页',
+        text: '进度看板',
         iconPath: './assets/tabbar/home.png',
         selectedIconPath: './assets/tabbar/home-active.png',
       },
@@ -35,6 +35,12 @@ export default defineAppConfig({
         text: '话题',
         iconPath: './assets/tabbar/folder-kanban.png',
         selectedIconPath: './assets/tabbar/folder-kanban-active.png',
+      },
+      {
+        pagePath: 'pages/material-library/index',
+        text: '资料库',
+        iconPath: './assets/tabbar/book-open.png',
+        selectedIconPath: './assets/tabbar/book-open-active.png',
       },
       {
         pagePath: 'pages/profile/index',

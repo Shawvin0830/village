@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Network } from '@/network'
-import { Plus, ChevronRight, Search, FileText, BookOpen, Trash2 } from 'lucide-react-taro'
+import { Plus, ChevronRight, Search, FileText, BookOpen, Trash2, Settings } from 'lucide-react-taro'
 
 interface Topic {
   id: string
@@ -34,6 +34,7 @@ const TopicsPage = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
+  const [editMode, setEditMode] = useState(false)
 
   const fetchTopics = useCallback(async () => {
     try {
@@ -135,14 +136,25 @@ const TopicsPage = () => {
           <Text className="block text-xl font-bold text-stone-800">话题管理</Text>
           <Text className="block text-sm text-stone-500">管理你的村庄记忆话题</Text>
         </View>
-        <Button
-          size="sm"
-          className="bg-amber-700 hover:bg-amber-800 text-white"
-          onClick={() => setShowCreate(true)}
-        >
-          <Plus size={16} color="#B45309" className="mr-1" />
-          <Text>新建</Text>
-        </Button>
+        <View className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            className={editMode ? 'bg-amber-100 text-amber-700' : 'text-stone-500'}
+            onClick={() => setEditMode(!editMode)}
+          >
+            <Settings size={16} color={editMode ? '#B45309' : '#78716C'} className="mr-1" />
+            <Text className="text-xs">{editMode ? '完成' : '管理'}</Text>
+          </Button>
+          <Button
+            size="sm"
+            className="bg-amber-700 hover:bg-amber-800 text-white"
+            onClick={() => setShowCreate(true)}
+          >
+            <Plus size={16} color="#B45309" className="mr-1" />
+            <Text>新建</Text>
+          </Button>
+        </View>
       </View>
 
       {/* 搜索与材料入口 */}
@@ -246,15 +258,17 @@ const TopicsPage = () => {
                       </View>
                     </View>
                     <View className="flex items-center ml-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-stone-400 mr-1"
-                        disabled={deletingId === topic.id}
-                        onClick={(event) => handleDeleteTopic(topic, event)}
-                      >
-                        <Trash2 size={16} color="#DC2626" />
-                      </Button>
+                      {editMode && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-stone-400 mr-1"
+                          disabled={deletingId === topic.id}
+                          onClick={(event) => handleDeleteTopic(topic, event)}
+                        >
+                          <Trash2 size={16} color="#DC2626" />
+                        </Button>
+                      )}
                       <ChevronRight size={20} color="#A8A29E" />
                     </View>
                   </View>
