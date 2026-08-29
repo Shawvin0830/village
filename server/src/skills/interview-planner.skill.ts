@@ -83,19 +83,11 @@ export class InterviewPlannerSkill {
       .order('created_at', { ascending: false })
       .limit(1);
 
-    // 参考资料（用户手动输入 + AI联网搜索）
-    const { data: referenceMaterials } = await this.client
-      .from('reference_materials')
-      .select('id, source, title, content, structured_data, tags')
-      .eq('topic_id', topicId)
-      .order('created_at', { ascending: false });
-
     return {
       topic,
       subtopics: subtopics || [],
       records: records || [],
       existingPlan: existingPlans?.[0] || null,
-      referenceMaterials: referenceMaterials || [],
     };
   }
 
@@ -103,7 +95,7 @@ export class InterviewPlannerSkill {
    * 调用 LLM 生成采访策划
    */
   private async generatePlan(context: Awaited<ReturnType<InterviewPlannerSkill['collectContext']>>) {
-    const { topic, subtopics, records, existingPlan, referenceMaterials } = context;
+    const { topic, subtopics, records, existingPlan } = context;
 
     const subtopicInfo = subtopics
       .map((s) => {
@@ -123,27 +115,6 @@ export class InterviewPlannerSkill {
     const existingPlanInfo = existingPlan
       ? `已有策划摘要：${existingPlan.context_summary?.substring(0, 200) || '无'}`
       : '暂无已有策划';
-
-    // 参考资料信息
-    const manualMaterials = referenceMaterials
-      .filter((m) => m.source === 'manual')
-      .map((m) => `${m.title}: ${m.content?.substring(0, 200) || ''}`)
-      .join('\n');
-
-    const webSearchMaterials = referenceMaterials
-      .filter((m) => m.source === 'web_search')
-      .map((m) => {
-        const structured = m.structured_data as any;
-        const summary = structured?.summary || m.content?.substring(0, 200) || '';
-        return `${m.title}: ${summary}`;
-      })
-      .join('\n');
-
-    const referenceInfo = `## 用户提供的参考资料
-${manualMaterials || '暂无'}
-
-## AI联网搜索的资料
-${webSearchMaterials || '暂无'}`;
 
     const systemPrompt = `你叫"村庄记忆"的采访策划师，是一个专业的文化记录顾问。
 
@@ -196,13 +167,10 @@ ${recordInfo ? recordInfo.substring(0, 1500) : '暂无已有采访记录'}
 ## 已有策划
 ${existingPlanInfo}
 
-${referenceInfo}
-
 请为这个话题生成一份专业的采访策划。注意：
 1. 如果已有采访记录，请找到还没覆盖的空白点
-2. 充分利用参考资料中的信息，在语境摘要中体现
-3. 孩子版问题要足够简单，让8-12岁的孩子能直接问出口
-4. 追问锦囊要具体实用，给出场景和对应的应对话术`;
+2. 孩子版问题要足够简单，让8-12岁的孩子能直接问出口
+3. 追问锦囊要具体实用，给出场景和对应的应对话术`;
 
     const llmClient = this.getLLMClient();
     const response = await llmClient.invoke(
