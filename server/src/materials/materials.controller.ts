@@ -14,6 +14,22 @@ export class MaterialsController {
   ) {}
 
   /**
+   * 资料库全局搜索（按话题名、关键词、被采访者）
+   */
+  @Get('library-search')
+  @HttpCode(200)
+  async librarySearch(
+    @Query('q') query: string,
+    @Query('source') source?: string,
+  ) {
+    if (!query?.trim()) {
+      return { code: 200, msg: 'success', data: [] }
+    }
+    const results = await this.materialsService.librarySearch(query.trim(), source)
+    return { code: 200, msg: 'success', data: results }
+  }
+
+  /**
    * 获取有资料的话题列表（资料库首页），支持来源筛选
    */
   @Get('topics')

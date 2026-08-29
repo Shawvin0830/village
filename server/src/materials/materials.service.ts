@@ -13,6 +13,98 @@ export class MaterialsService {
   }
 
   /**
+   * 资料库全局搜索：按话题名、关键词、被采访者搜索
+   */
+  async librarySearch(query: string, source?: string) {
+    const q = query.trim()
+    if (!q) return []
+
+    // 1. 搜索匹配的话题
+    const { data: matchedTopics } = await this.client
+      .from('topics')
+      .select('id, name, description')
+      .ilike('name', `%${q}%`)
+
+    // 2. 搜索匹配的被采访者，获取其话题
+    const { data: matchedInterviewees } = await this.client
+      .from('interviewees')
+      .select('topic_id, name, topic:topics(id, name, description)')
+      .ilike('name', `%${q}%`)
+
+    // 3. 搜索匹配的资料，获取其话题
+    let materialsQuery = this.client
+      .from('reference_materials')
+      .select('topic_id, topic:topics(id, name, description)')
+      .or(`title.ilike.%${q}%,content.ilike.%${q}%`)
+
+    if (source) {
+      if (source === 'external') {
+        materialsQuery = materialsQuery.neq('source', 'interview')
+      } else {
+        materialsQuery = materialsQuery.eq('source', source)
+      }
+    }
+
+    const { data: matchedMaterials } = await materialsQuery
+
+    // 合并所有匹配的话题 ID
+    const topicIdSet = new Set<string>()
+    const topicInfoMap = new Map<string, { id: string; name: string; description: string | null }>()
+
+    for (const t of matchedTopics || []) {
+      topicIdSet.add(t.id)
+      topicInfoMap.set(t.id, t)
+    }
+    for (const item of matchedInterviewees || []) {
+      const topic = (Array.isArray(item.topic) ? item.topic[0] : item.topic) as { id: string; name: string; description: string | null }
+      if (topic) {
+        topicIdSet.add(topic.id)
+        topicInfoMap.set(topic.id, topic)
+      }
+    }
+    for (const item of matchedMaterials || []) {
+      const topic = (Array.isArray(item.topic) ? item.topic[0] : item.topic) as { id: string; name: string; description: string | null }
+      if (topic) {
+        topicIdSet.add(topic.id)
+        topicInfoMap.set(topic.id, topic)
+      }
+    }
+
+    // 统计每个话题下符合条件的资料数量
+    const results: { topicId: string; topicName: string; topicDescription: string | null; materialCount: number }[] = []
+
+    for (const topicId of topicIdSet) {
+      const topicInfo = topicInfoMap.get(topicId)
+      if (!topicInfo) continue
+
+      let countQuery = this.client
+        .from('reference_materials')
+        .select('id', { count: 'exact', head: true })
+        .eq('topic_id', topicId)
+
+      if (source) {
+        if (source === 'external') {
+          countQuery = countQuery.neq('source', 'interview')
+        } else {
+          countQuery = countQuery.eq('source', source)
+        }
+      }
+
+      const { count } = await countQuery
+
+      results.push({
+        topicId: topicInfo.id,
+        topicName: topicInfo.name,
+        topicDescription: topicInfo.description,
+        materialCount: count || 0,
+      })
+    }
+
+    // 按资料数量降序排列
+    return results.sort((a, b) => b.materialCount - a.materialCount)
+  }
+
+  /**
    * 获取有资料的话题列表（按来源筛选），包含资料数量
    */
   async findTopicsWithMaterials(source?: string) {

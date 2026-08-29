@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Network } from '@/network'
-import { Search, BookOpen, X, Sparkles, FolderOpen, ChevronLeft, FileText } from 'lucide-react-taro'
+import { Search, BookOpen, X, Sparkles, FolderOpen, ChevronLeft } from 'lucide-react-taro'
 
 interface TopicItem {
   topicId: string
@@ -37,19 +37,26 @@ const SOURCE_LABEL: Record<string, string> = {
 
 const MaterialLibraryPage = () => {
   const [activeTab, setActiveTab] = useState('interview')
-  
+
   // 第一级：话题列表
   const [topics, setTopics] = useState<TopicItem[]>([])
   const [topicsLoading, setTopicsLoading] = useState(true)
-  
+
+  // 第一级：搜索
+  const [topSearchQuery, setTopSearchQuery] = useState('')
+  const [topSearching, setTopSearching] = useState(false)
+  const [isTopSearchMode, setIsTopSearchMode] = useState(false)
+
   // 第二级：资料列表
   const [selectedTopic, setSelectedTopic] = useState<TopicItem | null>(null)
   const [materials, setMaterials] = useState<Material[]>([])
   const [materialsLoading, setMaterialsLoading] = useState(false)
-  
-  // 搜索
+
+  // 第二级：搜索
   const [searchQuery, setSearchQuery] = useState('')
   const [searching, setSearching] = useState(false)
+
+  const topSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchTopics = useCallback(async (source?: string) => {
@@ -78,7 +85,6 @@ const MaterialLibraryPage = () => {
       })
       const data = res.data?.data
       if (Array.isArray(data)) {
-        // 根据当前 Tab 筛选
         const filtered = activeTab === 'interview'
           ? data.filter((m: Material) => m.source === 'interview')
           : data.filter((m: Material) => m.source !== 'interview')
@@ -103,9 +109,49 @@ const MaterialLibraryPage = () => {
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
-    setSearchQuery('')
+    setTopSearchQuery('')
+    setIsTopSearchMode(false)
     setSelectedTopic(null)
     fetchTopics(tab)
+  }
+
+  /** 首页全局搜索（按话题/关键词/被采访者） */
+  const handleTopSearch = useCallback(
+    (query: string) => {
+      setTopSearchQuery(query)
+      if (topSearchTimer.current) clearTimeout(topSearchTimer.current)
+
+      if (!query.trim()) {
+        setIsTopSearchMode(false)
+        fetchTopics()
+        return
+      }
+
+      topSearchTimer.current = setTimeout(async () => {
+        try {
+          setTopSearching(true)
+          setIsTopSearchMode(true)
+          const res = await Network.request({
+            url: `/api/materials/library-search?q=${encodeURIComponent(query.trim())}&source=${activeTab}`,
+          })
+          const data = res.data?.data
+          if (Array.isArray(data)) {
+            setTopics(data)
+          }
+        } catch (err) {
+          console.error('搜索失败:', err)
+        } finally {
+          setTopSearching(false)
+        }
+      }, 500)
+    },
+    [activeTab, fetchTopics],
+  )
+
+  const handleClearTopSearch = () => {
+    setTopSearchQuery('')
+    setIsTopSearchMode(false)
+    fetchTopics()
   }
 
   const handleTopicClick = (topic: TopicItem) => {
@@ -142,7 +188,6 @@ const MaterialLibraryPage = () => {
           })
           const results = searchRes.data?.data
           if (Array.isArray(results)) {
-            // 根据当前 Tab 筛选
             const filtered = activeTab === 'interview'
               ? results.filter((m: Material) => m.source === 'interview')
               : results.filter((m: Material) => m.source !== 'interview')
@@ -241,7 +286,7 @@ const MaterialLibraryPage = () => {
           ) : materials.length === 0 ? (
             <Card className="border-stone-100 bg-white mt-4">
               <CardContent className="p-8 flex flex-col items-center">
-                <FileText size={40} color="#D6D3D1" />
+                <BookOpen size={40} color="#D6D3D1" />
                 <Text className="block text-sm text-stone-500 text-center mt-4">
                   {searchQuery ? '没有找到相关资料' : '该话题下暂无资料'}
                 </Text>
@@ -285,11 +330,44 @@ const MaterialLibraryPage = () => {
     )
   }
 
-  // 第一级：话题列表页
+  // 第一级：话题列表页（带搜索）
   return (
     <View className="min-h-screen bg-stone-50">
-      {/* Tab 切换 */}
+      {/* 顶部搜索栏 */}
       <View className="px-4 pt-4 pb-2">
+        <View
+          style={{
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            padding: '8px 12px',
+            borderWidth: '1px',
+            borderStyle: 'solid',
+            borderColor: topSearchQuery ? '#B45309' : '#E7E5E4',
+          }}
+        >
+          <Search size={18} color="#78716C" />
+          <View style={{ flex: 1, marginLeft: '8px' }}>
+            <Input
+              className="w-full bg-transparent"
+              placeholder="搜索话题、关键词、被采访者..."
+              value={topSearchQuery}
+              onInput={(e) => handleTopSearch(e.detail.value)}
+              confirmType="search"
+            />
+          </View>
+          {topSearchQuery && (
+            <Button size="sm" variant="ghost" className="p-1 h-auto" onClick={handleClearTopSearch}>
+              <X size={16} color="#78716C" />
+            </Button>
+          )}
+        </View>
+      </View>
+
+      {/* Tab 切换 */}
+      <View className="px-4 pb-2">
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="bg-stone-100">
             <TabsTrigger value="interview">
@@ -304,6 +382,25 @@ const MaterialLibraryPage = () => {
         </Tabs>
       </View>
 
+      {/* 搜索状态 */}
+      {topSearching && (
+        <View className="px-4 py-2">
+          <View className="flex items-center gap-2">
+            <Sparkles size={14} color="#B45309" />
+            <Text className="text-xs text-amber-700">搜索中...</Text>
+          </View>
+        </View>
+      )}
+
+      {/* 搜索结果提示 */}
+      {isTopSearchMode && !topSearching && (
+        <View className="px-4 py-2">
+          <Text className="block text-xs text-stone-500">
+            找到 {topics.length} 个相关话题
+          </Text>
+        </View>
+      )}
+
       {/* 话题列表 */}
       <View className="px-4">
         {topicsLoading ? (
@@ -317,14 +414,16 @@ const MaterialLibraryPage = () => {
             <CardContent className="p-8 flex flex-col items-center">
               <BookOpen size={40} color="#D6D3D1" />
               <Text className="block text-sm text-stone-500 text-center mt-4">
-                {activeTab === 'interview'
-                  ? '还没有历史采访资料\n采访录音转写后会沉淀到这里'
-                  : '还没有外部文献资料\n可通过话题中的 AI 搜索获取'}
+                {isTopSearchMode
+                  ? '没有找到相关内容\n换个关键词试试'
+                  : activeTab === 'interview'
+                    ? '还没有历史采访资料\n采访录音转写后会沉淀到这里'
+                    : '还没有外部文献资料\n可通过话题中的 AI 搜索获取'}
               </Text>
             </CardContent>
           </Card>
         ) : (
-          <ScrollView scrollY className="mt-4" style={{ height: 'calc(100vh - 160px)' }}>
+          <ScrollView scrollY className="mt-2" style={{ height: 'calc(100vh - 220px)' }}>
             <View className="space-y-3 pb-6">
               {topics.map((topic) => (
                 <Card
