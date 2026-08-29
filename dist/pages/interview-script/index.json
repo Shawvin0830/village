@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "采访稿",
+  "usingComponents": {
+    "comp": "../../comp"
+  }
+}

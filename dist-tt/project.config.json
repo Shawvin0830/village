@@ -1,0 +1,11 @@
+{
+  "miniprogramRoot": "./",
+  "projectname": "coze-mini-program",
+  "appid": "",
+  "setting": {
+    "urlCheck": false,
+    "es6": false,
+    "postcss": false,
+    "minified": false
+  }
+}

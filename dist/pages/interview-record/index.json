@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "录音转写",
+  "usingComponents": {
+    "comp": "../../comp"
+  }
+}
