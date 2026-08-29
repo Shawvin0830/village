@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Network } from '@/network'
-import { BookOpen, RefreshCw, FileText, FolderOpen, Search, Globe, ChevronDown, ChevronUp, FileSearch, BookOpenCheck, Save, Send, MessageCircle, ChevronRight, CirclePlus } from 'lucide-react-taro'
+import { BookOpen, RefreshCw, FileText, FolderOpen, Search, Globe, ChevronDown, ChevronUp, FileSearch, BookOpenCheck, Save, Send, MessageCircle, ChevronRight, CirclePlus, CircleCheck, FilePen } from 'lucide-react-taro'
 
 interface CoreQuestion {
   dimension: string
@@ -1144,17 +1144,30 @@ const InterviewPlanPage = () => {
                     </View>
                   )}
                   {selectionConfirmed && (
-                    <View className="mt-4 p-3 bg-green-50 rounded-lg flex items-center justify-between">
-                      <Text className="block text-sm text-green-700">
-                        已保存 {selectedQuestions.size} 个问题到采访稿
-                      </Text>
+                    <View className="mt-4 p-4 bg-green-50 rounded-lg">
+                      <View className="flex items-center justify-between">
+                        <View className="flex items-center">
+                          <CircleCheck size={18} color="#16a34a" className="mr-2" />
+                          <Text className="block text-sm text-green-700 font-medium">
+                            生成成功！已保存 {selectedQuestions.size} 个问题
+                          </Text>
+                        </View>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-stone-200"
+                          onClick={() => setSelectionConfirmed(false)}
+                        >
+                          <Text className="text-xs">重新选择</Text>
+                        </Button>
+                      </View>
                       <Button
                         variant="outline"
-                        size="sm"
-                        className="border-stone-200"
-                        onClick={() => setSelectionConfirmed(false)}
+                        className="w-full mt-3 border-green-200 text-green-700"
+                        onClick={() => Taro.navigateTo({ url: `/pages/interview-script/index?topicId=${topicId}` })}
                       >
-                        <Text className="text-xs">重新选择</Text>
+                        <FilePen size={16} color="#16a34a" className="mr-2" />
+                        <Text className="text-sm">查看采访稿</Text>
                       </Button>
                     </View>
                   )}

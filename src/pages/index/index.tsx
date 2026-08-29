@@ -24,7 +24,7 @@ interface Topic {
 
 // 步骤定义
 const STEPS = [
-  { key: 'plan', label: '策划', icon: BookOpen },
+  { key: 'plan', label: '采访策划', icon: BookOpen },
   { key: 'auth', label: '授权', icon: Users },
   { key: 'interview', label: '采访', icon: Mic },
   { key: 'organize', label: '整理', icon: FileText },
@@ -334,7 +334,7 @@ const IndexPage = () => {
                   onClick={() => goToInterviewPlan(selectedTopic.id)}
                 >
                   <BookOpen size={18} color="#B45309" />
-                  <Text className="text-xs text-stone-600">策划</Text>
+                  <Text className="text-xs text-stone-600">采访策划</Text>
                 </Button>
                 <Button
                   variant="ghost"
