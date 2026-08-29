@@ -12,9 +12,14 @@
 
 ## 产品入口
 
-- **H5 预览**：`http://localhost:5000`（开发环境）
-- **后端 API**：`http://localhost:3000/api`（全局前缀 `/api`）
-- **微信小程序**：通过 `pnpm build:weapp` 构建后在微信开发者工具中预览，或使用 `pnpm preview:weapp` 生成预览二维码
+**H5 地址**：https://8aaddd1a-75d7-4134-ae7f-d060eb488b19.dev.coze.site
+
+| 页面 | 链接 |
+|------|------|
+| 进度看板（首页） | https://8aaddd1a-75d7-4134-ae7f-d060eb488b19.dev.coze.site/#/pages/index/index |
+| 话题管理 | https://8aaddd1a-75d7-4134-ae7f-d060eb488b19.dev.coze.site/#/pages/topics/index |
+| 资料库 | https://8aaddd1a-75d7-4134-ae7f-d060eb488b19.dev.coze.site/#/pages/material-library/index |
+| 我的 | https://8aaddd1a-75d7-4134-ae7f-d060eb488b19.dev.coze.site/#/pages/profile/index |
 
 ---
 
