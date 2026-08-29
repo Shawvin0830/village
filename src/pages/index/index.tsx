@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Network } from '@/network'
-import { BookOpen, ChevronDown, CircleCheck, CircleDot, ArrowRight, Plus, Archive, Users, Mic, FileText, FilePen } from 'lucide-react-taro'
+import { BookOpen, ChevronDown, CircleCheck, CircleDot, ArrowRight, Plus, Archive, Users, Mic, FileText, FilePen, MessageCircle } from 'lucide-react-taro'
 
 interface Topic {
   id: string
@@ -125,6 +125,10 @@ const IndexPage = () => {
 
   const goToAuthorization = (topicId: string) => {
     Taro.navigateTo({ url: `/pages/authorization/index?topicId=${topicId}` })
+  }
+
+  const goToInterviewManage = (topicId: string) => {
+    Taro.navigateTo({ url: `/pages/interview-manage/index?topicId=${topicId}` })
   }
 
   const goToInterviewRecord = (topicId: string) => {
@@ -331,7 +335,7 @@ const IndexPage = () => {
               </View>
 
               {/* 快捷操作按钮 */}
-              <View className="grid grid-cols-4 gap-2 mt-4 pt-4 border-t border-stone-100">
+              <View className="grid grid-cols-5 gap-2 mt-4 pt-4 border-t border-stone-100">
                 <Button
                   variant="ghost"
                   className="flex flex-col items-center gap-1 h-auto py-2"
@@ -355,6 +359,14 @@ const IndexPage = () => {
                 >
                   <Users size={18} color="#B45309" />
                   <Text className="text-xs text-stone-600">授权</Text>
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="flex flex-col items-center gap-1 h-auto py-2"
+                  onClick={() => goToInterviewManage(selectedTopic.id)}
+                >
+                  <MessageCircle size={18} color="#B45309" />
+                  <Text className="text-xs text-stone-600">采访</Text>
                 </Button>
                 <Button
                   variant="ghost"
