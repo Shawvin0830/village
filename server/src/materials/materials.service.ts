@@ -13,6 +13,49 @@ export class MaterialsService {
   }
 
   /**
+   * 获取有资料的话题列表（按来源筛选），包含资料数量
+   */
+  async findTopicsWithMaterials(source?: string) {
+    let query = this.client
+      .from('reference_materials')
+      .select('topic_id, topic:topics(id, name, description)')
+
+    if (source) {
+      if (source === 'external') {
+        query = query.neq('source', 'interview')
+      } else {
+        query = query.eq('source', source)
+      }
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      this.logger.error(`Failed to fetch topics with materials: ${error.message}`)
+      return []
+    }
+
+    // 按话题分组并统计数量
+    const topicMap = new Map<string, { topic: { id: string; name: string; description: string | null }; count: number }>()
+    for (const item of data || []) {
+      const topicId = item.topic_id
+      const topicInfo = (Array.isArray(item.topic) ? item.topic[0] : item.topic) as { id: string; name: string; description: string | null }
+      if (!topicInfo) continue
+      if (!topicMap.has(topicId)) {
+        topicMap.set(topicId, { topic: topicInfo, count: 0 })
+      }
+      topicMap.get(topicId)!.count++
+    }
+
+    return Array.from(topicMap.values()).map((v) => ({
+      topicId: v.topic.id,
+      topicName: v.topic.name,
+      topicDescription: v.topic.description,
+      materialCount: v.count,
+    }))
+  }
+
+  /**
    * 获取所有资料（资料库 TabBar 页面使用），支持来源筛选，关联话题名称
    */
   async findAll(source?: string) {

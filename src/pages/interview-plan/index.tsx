@@ -492,11 +492,15 @@ const InterviewPlanPage = () => {
   const [savingScript, setSavingScript] = useState(false)
 
   const confirmSelection = async () => {
+    console.log('confirmSelection called, selectedQuestions.size:', selectedQuestions.size)
     if (selectedQuestions.size === 0) {
       Taro.showToast({ title: '请至少选择一个问题', icon: 'none' })
       return
     }
-    if (!plan) return
+    if (!plan) {
+      console.log('No plan available')
+      return
+    }
 
     try {
       setSavingScript(true)
@@ -1136,7 +1140,10 @@ const InterviewPlanPage = () => {
                     <View className="mt-4">
                       <Button
                         className="w-full bg-amber-700 hover:bg-amber-800 text-white"
-                        onClick={confirmSelection}
+                        onClick={() => {
+                          console.log('Button clicked')
+                          confirmSelection()
+                        }}
                         disabled={savingScript}
                       >
                         <Text className="text-sm">{savingScript ? '保存中...' : `确认选择 ${selectedQuestions.size} 个问题`}</Text>

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Network } from '@/network'
-import { BookOpen, ChevronDown, CircleCheck, CircleDot, ArrowRight, Plus, Archive, Users, Mic, FileText } from 'lucide-react-taro'
+import { BookOpen, ChevronDown, CircleCheck, CircleDot, ArrowRight, Plus, Archive, Users, Mic, FileText, FilePen } from 'lucide-react-taro'
 
 interface Topic {
   id: string
@@ -117,6 +117,10 @@ const IndexPage = () => {
 
   const goToInterviewPlan = (topicId: string) => {
     Taro.navigateTo({ url: `/pages/interview-plan/index?topicId=${topicId}` })
+  }
+
+  const goToScript = (topicId: string) => {
+    Taro.navigateTo({ url: `/pages/interview-script/index?topicId=${topicId}` })
   }
 
   const goToAuthorization = (topicId: string) => {
@@ -327,7 +331,7 @@ const IndexPage = () => {
               </View>
 
               {/* 快捷操作按钮 */}
-              <View className="grid grid-cols-4 gap-2 mt-4 pt-4 border-t border-stone-100">
+              <View className="grid grid-cols-5 gap-2 mt-4 pt-4 border-t border-stone-100">
                 <Button
                   variant="ghost"
                   className="flex flex-col items-center gap-1 h-auto py-2"
@@ -335,6 +339,14 @@ const IndexPage = () => {
                 >
                   <BookOpen size={18} color="#B45309" />
                   <Text className="text-xs text-stone-600">采访策划</Text>
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="flex flex-col items-center gap-1 h-auto py-2"
+                  onClick={() => goToScript(selectedTopic.id)}
+                >
+                  <FilePen size={18} color="#B45309" />
+                  <Text className="text-xs text-stone-600">采访稿</Text>
                 </Button>
                 <Button
                   variant="ghost"

@@ -14,6 +14,16 @@ export class MaterialsController {
   ) {}
 
   /**
+   * 获取有资料的话题列表（资料库首页），支持来源筛选
+   */
+  @Get('topics')
+  @HttpCode(200)
+  async findTopicsWithMaterials(@Query('source') source?: string) {
+    const topics = await this.materialsService.findTopicsWithMaterials(source)
+    return { code: 200, msg: 'success', data: topics }
+  }
+
+  /**
    * 获取所有资料（资料库 TabBar 页面使用），支持来源筛选
    */
   @Get()

@@ -1,5 +1,5 @@
 import { View, Text, ScrollView } from '@tarojs/components'
-import { useState, useCallback, useRef, useMemo } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useLoad, useDidShow } from '@tarojs/taro'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,14 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Network } from '@/network'
-import { Search, BookOpen, X, Sparkles, FolderOpen } from 'lucide-react-taro'
+import { Search, BookOpen, X, Sparkles, FolderOpen, ChevronLeft, FileText } from 'lucide-react-taro'
+
+interface TopicItem {
+  topicId: string
+  topicName: string
+  topicDescription: string | null
+  materialCount: number
+}
 
 interface Material {
   id: string
@@ -19,13 +26,6 @@ interface Material {
   tags: string[] | null
   url: string | null
   created_at: string
-  topic?: { id: string; name: string } | null
-}
-
-interface TopicGroup {
-  topicId: string
-  topicName: string
-  materials: Material[]
 }
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -36,67 +36,117 @@ const SOURCE_LABEL: Record<string, string> = {
 }
 
 const MaterialLibraryPage = () => {
+  const [activeTab, setActiveTab] = useState('interview')
+  
+  // 第一级：话题列表
+  const [topics, setTopics] = useState<TopicItem[]>([])
+  const [topicsLoading, setTopicsLoading] = useState(true)
+  
+  // 第二级：资料列表
+  const [selectedTopic, setSelectedTopic] = useState<TopicItem | null>(null)
   const [materials, setMaterials] = useState<Material[]>([])
-  const [loading, setLoading] = useState(true)
+  const [materialsLoading, setMaterialsLoading] = useState(false)
+  
+  // 搜索
   const [searchQuery, setSearchQuery] = useState('')
   const [searching, setSearching] = useState(false)
-  const [activeTab, setActiveTab] = useState('interview')
-
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const fetchMaterials = useCallback(async (source?: string) => {
+  const fetchTopics = useCallback(async (source?: string) => {
     try {
-      setLoading(true)
-      const s = source || activeTab === 'interview' ? 'interview' : 'external'
+      setTopicsLoading(true)
+      const s = source || activeTab
       const res = await Network.request({
-        url: `/api/materials?source=${s}`,
+        url: `/api/materials/topics?source=${s}`,
       })
       const data = res.data?.data
       if (Array.isArray(data)) {
-        setMaterials(data)
+        setTopics(data)
+      }
+    } catch (err) {
+      console.error('获取话题列表失败:', err)
+    } finally {
+      setTopicsLoading(false)
+    }
+  }, [activeTab])
+
+  const fetchMaterials = useCallback(async (topicId: string) => {
+    try {
+      setMaterialsLoading(true)
+      const res = await Network.request({
+        url: `/api/materials/topic/${topicId}`,
+      })
+      const data = res.data?.data
+      if (Array.isArray(data)) {
+        // 根据当前 Tab 筛选
+        const filtered = activeTab === 'interview'
+          ? data.filter((m: Material) => m.source === 'interview')
+          : data.filter((m: Material) => m.source !== 'interview')
+        setMaterials(filtered)
       }
     } catch (err) {
       console.error('获取资料列表失败:', err)
     } finally {
-      setLoading(false)
+      setMaterialsLoading(false)
     }
   }, [activeTab])
 
   useLoad(() => {
-    fetchMaterials('interview')
+    fetchTopics('interview')
   })
 
   useDidShow(() => {
-    fetchMaterials()
+    if (!selectedTopic) {
+      fetchTopics()
+    }
   })
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
     setSearchQuery('')
-    fetchMaterials(tab)
+    setSelectedTopic(null)
+    fetchTopics(tab)
   }
 
-  /** 搜索（防抖） */
+  const handleTopicClick = (topic: TopicItem) => {
+    setSelectedTopic(topic)
+    setSearchQuery('')
+    fetchMaterials(topic.topicId)
+  }
+
+  const handleBack = () => {
+    setSelectedTopic(null)
+    setSearchQuery('')
+    setMaterials([])
+  }
+
+  /** 搜索资料（在话题内） */
   const handleSearch = useCallback(
     (query: string) => {
       setSearchQuery(query)
       if (searchTimer.current) clearTimeout(searchTimer.current)
 
       if (!query.trim()) {
-        fetchMaterials()
+        if (selectedTopic) {
+          fetchMaterials(selectedTopic.topicId)
+        }
         return
       }
 
       searchTimer.current = setTimeout(async () => {
+        if (!selectedTopic) return
         try {
           setSearching(true)
-          const source = activeTab === 'interview' ? 'interview' : 'external'
           const searchRes = await Network.request({
-            url: `/api/materials/search?q=${encodeURIComponent(query.trim())}&source=${source}`,
+            url: `/api/materials/topic/${selectedTopic.topicId}/search?q=${encodeURIComponent(query.trim())}`,
           })
           const results = searchRes.data?.data
           if (Array.isArray(results)) {
-            setMaterials(results)
+            // 根据当前 Tab 筛选
+            const filtered = activeTab === 'interview'
+              ? results.filter((m: Material) => m.source === 'interview')
+              : results.filter((m: Material) => m.source !== 'interview')
+            setMaterials(filtered)
           }
         } catch (err) {
           console.error('搜索失败:', err)
@@ -105,98 +155,141 @@ const MaterialLibraryPage = () => {
         }
       }, 500)
     },
-    [activeTab, fetchMaterials],
+    [selectedTopic, activeTab, fetchMaterials],
   )
 
   const handleClearSearch = () => {
     setSearchQuery('')
-    fetchMaterials()
-  }
-
-  /** 按话题分组 */
-  const groupedData = useMemo((): TopicGroup[] => {
-    const map = new Map<string, TopicGroup>()
-    for (const m of materials) {
-      const topicId = m.topic_id
-      const topicName = m.topic?.name || '未分类话题'
-      if (!map.has(topicId)) {
-        map.set(topicId, { topicId, topicName, materials: [] })
-      }
-      map.get(topicId)!.materials.push(m)
+    if (selectedTopic) {
+      fetchMaterials(selectedTopic.topicId)
     }
-    return Array.from(map.values())
-  }, [materials])
+  }
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr)
     return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
   }
 
-  const renderMaterialCard = (item: Material) => (
-    <Card key={item.id} className="border-stone-100 shadow-sm bg-white">
-      <CardContent className="p-4">
-        <Text className="block text-sm font-semibold text-stone-800 mb-2">
-          {item.title}
-        </Text>
-        <Text className="block text-xs text-stone-500 line-clamp-3 mb-3">
-          {item.content}
-        </Text>
-        <View className="flex items-center justify-between">
-          <View className="flex flex-wrap gap-1">
-            {item.tags && Array.isArray(item.tags) && item.tags.slice(0, 3).map((tag, i) => (
-              <Badge key={i} className="bg-stone-100 text-stone-600">
-                <Text className="text-xs">{tag}</Text>
-              </Badge>
-            ))}
-            <Badge className="bg-stone-50 text-stone-400">
-              <Text className="text-xs">{SOURCE_LABEL[item.source] || item.source}</Text>
-            </Badge>
-          </View>
-          <Text className="text-xs text-stone-400 flex-shrink-0">
-            {formatDate(item.created_at)}
+  // 第二级：资料详情页
+  if (selectedTopic) {
+    return (
+      <View className="min-h-screen bg-stone-50">
+        {/* 顶部导航栏 */}
+        <View className="bg-white border-b border-stone-200 px-4 py-3 flex items-center gap-3">
+          <Button size="sm" variant="ghost" className="p-1 h-auto" onClick={handleBack}>
+            <ChevronLeft size={20} color="#78716C" />
+          </Button>
+          <Text className="block text-base font-semibold text-stone-800 flex-1">
+            {selectedTopic.topicName}
           </Text>
+          <Badge className="bg-amber-50 text-amber-700">
+            <Text className="text-xs">{selectedTopic.materialCount} 条资料</Text>
+          </Badge>
         </View>
-      </CardContent>
-    </Card>
-  )
 
-  return (
-    <View className="min-h-screen bg-stone-50">
-      {/* 顶部搜索栏 */}
-      <View className="px-4 pt-4 pb-2">
-        <View
-          style={{
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: '#ffffff',
-            borderRadius: '12px',
-            padding: '8px 12px',
-            borderWidth: '1px',
-            borderStyle: 'solid',
-            borderColor: searchQuery ? '#B45309' : '#E7E5E4',
-          }}
-        >
-          <Search size={18} color="#78716C" />
-          <View style={{ flex: 1, marginLeft: '8px' }}>
-            <Input
-              className="w-full bg-transparent"
-              placeholder={activeTab === 'interview' ? '搜索历史采访资料...' : '搜索外部文献资料...'}
-              value={searchQuery}
-              onInput={(e) => handleSearch(e.detail.value)}
-              confirmType="search"
-            />
+        {/* 搜索栏 */}
+        <View className="px-4 pt-4 pb-2">
+          <View
+            style={{
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#ffffff',
+              borderRadius: '12px',
+              padding: '8px 12px',
+              borderWidth: '1px',
+              borderStyle: 'solid',
+              borderColor: searchQuery ? '#B45309' : '#E7E5E4',
+            }}
+          >
+            <Search size={18} color="#78716C" />
+            <View style={{ flex: 1, marginLeft: '8px' }}>
+              <Input
+                className="w-full bg-transparent"
+                placeholder="搜索资料..."
+                value={searchQuery}
+                onInput={(e) => handleSearch(e.detail.value)}
+                confirmType="search"
+              />
+            </View>
+            {searchQuery && (
+              <Button size="sm" variant="ghost" className="p-1 h-auto" onClick={handleClearSearch}>
+                <X size={16} color="#78716C" />
+              </Button>
+            )}
           </View>
-          {searchQuery && (
-            <Button size="sm" variant="ghost" className="p-1 h-auto" onClick={handleClearSearch}>
-              <X size={16} color="#78716C" />
-            </Button>
+        </View>
+
+        {/* 搜索状态 */}
+        {searching && (
+          <View className="px-4 py-2">
+            <View className="flex items-center gap-2">
+              <Sparkles size={14} color="#B45309" />
+              <Text className="text-xs text-amber-700">检索中...</Text>
+            </View>
+          </View>
+        )}
+
+        {/* 资料列表 */}
+        <View className="px-4">
+          {materialsLoading ? (
+            <View className="space-y-3 mt-2">
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </View>
+          ) : materials.length === 0 ? (
+            <Card className="border-stone-100 bg-white mt-4">
+              <CardContent className="p-8 flex flex-col items-center">
+                <FileText size={40} color="#D6D3D1" />
+                <Text className="block text-sm text-stone-500 text-center mt-4">
+                  {searchQuery ? '没有找到相关资料' : '该话题下暂无资料'}
+                </Text>
+              </CardContent>
+            </Card>
+          ) : (
+            <ScrollView scrollY className="mt-2" style={{ height: 'calc(100vh - 200px)' }}>
+              <View className="space-y-3 pb-6">
+                {materials.map((item) => (
+                  <Card key={item.id} className="border-stone-100 shadow-sm bg-white">
+                    <CardContent className="p-4">
+                      <Text className="block text-sm font-semibold text-stone-800 mb-2">
+                        {item.title}
+                      </Text>
+                      <Text className="block text-xs text-stone-500 line-clamp-3 mb-3">
+                        {item.content}
+                      </Text>
+                      <View className="flex items-center justify-between">
+                        <View className="flex flex-wrap gap-1">
+                          {item.tags && Array.isArray(item.tags) && item.tags.slice(0, 3).map((tag, i) => (
+                            <Badge key={i} className="bg-stone-100 text-stone-600">
+                              <Text className="text-xs">{tag}</Text>
+                            </Badge>
+                          ))}
+                          <Badge className="bg-stone-50 text-stone-400">
+                            <Text className="text-xs">{SOURCE_LABEL[item.source] || item.source}</Text>
+                          </Badge>
+                        </View>
+                        <Text className="text-xs text-stone-400 flex-shrink-0">
+                          {formatDate(item.created_at)}
+                        </Text>
+                      </View>
+                    </CardContent>
+                  </Card>
+                ))}
+              </View>
+            </ScrollView>
           )}
         </View>
       </View>
+    )
+  }
 
+  // 第一级：话题列表页
+  return (
+    <View className="min-h-screen bg-stone-50">
       {/* Tab 切换 */}
-      <View className="px-4 pb-2">
+      <View className="px-4 pt-4 pb-2">
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="bg-stone-100">
             <TabsTrigger value="interview">
@@ -211,66 +304,53 @@ const MaterialLibraryPage = () => {
         </Tabs>
       </View>
 
-      {/* 搜索状态提示 */}
-      {searching && (
-        <View className="px-4 py-2">
-          <View className="flex items-center gap-2">
-            <Sparkles size={14} color="#B45309" />
-            <Text className="text-xs text-amber-700">检索中...</Text>
-          </View>
-        </View>
-      )}
-
-      {/* 搜索结果提示 */}
-      {searchQuery && !searching && (
-        <View className="px-4 py-2">
-          <Text className="block text-xs text-stone-500">
-            找到 {materials.length} 条相关资料
-          </Text>
-        </View>
-      )}
-
-      {/* 分话题资料列表 */}
+      {/* 话题列表 */}
       <View className="px-4">
-        {loading ? (
-          <View className="space-y-3 mt-2">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
+        {topicsLoading ? (
+          <View className="space-y-3 mt-4">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
           </View>
-        ) : groupedData.length === 0 ? (
+        ) : topics.length === 0 ? (
           <Card className="border-stone-100 bg-white mt-4">
             <CardContent className="p-8 flex flex-col items-center">
               <BookOpen size={40} color="#D6D3D1" />
               <Text className="block text-sm text-stone-500 text-center mt-4">
-                {searchQuery
-                  ? '没有找到相关资料\n换个关键词试试'
-                  : activeTab === 'interview'
-                    ? '还没有历史采访资料\n采访录音转写后会沉淀到这里'
-                    : '还没有外部文献资料\n可通过话题中的 AI 搜索获取'}
+                {activeTab === 'interview'
+                  ? '还没有历史采访资料\n采访录音转写后会沉淀到这里'
+                  : '还没有外部文献资料\n可通过话题中的 AI 搜索获取'}
               </Text>
             </CardContent>
           </Card>
         ) : (
-          <ScrollView scrollY className="mt-2" style={{ height: 'calc(100vh - 240px)' }}>
-            <View className="space-y-4 pb-6">
-              {groupedData.map((group) => (
-                <View key={group.topicId}>
-                  {/* 话题标题 */}
-                  <View className="flex items-center gap-2 mb-2">
-                    <FolderOpen size={16} color="#B45309" />
-                    <Text className="block text-sm font-semibold text-stone-800">
-                      {group.topicName}
-                    </Text>
-                    <Badge className="bg-amber-50 text-amber-700">
-                      <Text className="text-xs">{group.materials.length}</Text>
+          <ScrollView scrollY className="mt-4" style={{ height: 'calc(100vh - 160px)' }}>
+            <View className="space-y-3 pb-6">
+              {topics.map((topic) => (
+                <Card
+                  key={topic.topicId}
+                  className="border-stone-100 shadow-sm bg-white active:bg-stone-50"
+                  onClick={() => handleTopicClick(topic)}
+                >
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <View className="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
+                      <FolderOpen size={20} color="#B45309" />
+                    </View>
+                    <View className="flex-1 min-w-0">
+                      <Text className="block text-sm font-semibold text-stone-800 truncate">
+                        {topic.topicName}
+                      </Text>
+                      {topic.topicDescription && (
+                        <Text className="block text-xs text-stone-500 truncate mt-1">
+                          {topic.topicDescription}
+                        </Text>
+                      )}
+                    </View>
+                    <Badge className="bg-amber-50 text-amber-700 flex-shrink-0">
+                      <Text className="text-xs">{topic.materialCount} 条</Text>
                     </Badge>
-                  </View>
-                  {/* 话题下的资料列表 */}
-                  <View className="space-y-2">
-                    {group.materials.map((item) => renderMaterialCard(item))}
-                  </View>
-                </View>
+                  </CardContent>
+                </Card>
               ))}
             </View>
           </ScrollView>
