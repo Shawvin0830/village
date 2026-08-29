@@ -17,7 +17,7 @@ export function IdentityBadge() {
   return (
     <View
       onClick={handleClick}
-      className="fixed top-12 right-4 z-50 flex items-center gap-1 bg-white/90 rounded-full px-3 py-1 shadow-sm border border-gray-100"
+      className="fixed top-12 right-4 z-50 flex items-center gap-1 bg-white rounded-full px-3 py-1 shadow-sm border border-gray-100"
     >
       <View className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
         <Text className="text-white text-xs font-bold">
