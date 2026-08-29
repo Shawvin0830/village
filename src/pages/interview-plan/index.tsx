@@ -89,21 +89,6 @@ const InterviewPlanPage = () => {
   const router = useRouter()
   const topicId = router.params.topicId || ''
 
-  // 追问锦囊分类渲染
-  const renderTipsCategory = (label: string, items: string[] | undefined) => {
-    if (!items || items.length === 0) return null
-    return (
-      <View className="mb-3">
-        <Text className="block text-sm font-medium text-stone-700 mb-1">{label}</Text>
-        <View className="space-y-1 ml-1">
-          {items.map((tip, i) => (
-            <Text key={i} className="block text-xs text-stone-600">· {tip}</Text>
-          ))}
-        </View>
-      </View>
-    )
-  }
-
   const [plan, setPlan] = useState<InterviewPlan | null>(null)
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -1015,38 +1000,6 @@ const InterviewPlanPage = () => {
                         <Text className="block text-sm text-stone-400 flex-shrink-0">{i + 1}.</Text>
                         <Text className="block text-sm text-stone-700">{q}</Text>
                       </View>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              {plan.tips && typeof plan.tips === 'object' && !Array.isArray(plan.tips) && (
-                <View className="mb-2">
-                  <Text className="block text-sm font-semibold text-stone-700 mb-2">追问锦囊</Text>
-                  <Text className="block text-xs text-stone-400 mb-3">
-                    不是背出来的，是听老人说的时候现抓的
-                  </Text>
-                  {renderTipsCategory('人物追问', plan.tips.people)}
-                  {renderTipsCategory('时间追问', plan.tips.time)}
-                  {renderTipsCategory('地点追问', plan.tips.place)}
-                  {renderTipsCategory('做法追问', plan.tips.practice)}
-                  {renderTipsCategory('变化追问', plan.tips.change)}
-                  {renderTipsCategory('方言追问', plan.tips.dialect)}
-                  {plan.tips.special && plan.tips.special.length > 0 && (
-                    <View className="mt-3 pt-3 border-t border-stone-100">
-                      <Text className="block text-xs font-medium text-stone-600 mb-1">特殊场景</Text>
-                      {renderTipsCategory('', plan.tips.special)}
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {plan.tips && Array.isArray(plan.tips) && plan.tips.length > 0 && (
-                <View className="mb-2">
-                  <Text className="block text-sm font-semibold text-stone-700 mb-2">追问锦囊</Text>
-                  <View className="space-y-1">
-                    {plan.tips.map((tip, i) => (
-                      <Text key={i} className="block text-xs text-stone-600">· {tip}</Text>
                     ))}
                   </View>
                 </View>
