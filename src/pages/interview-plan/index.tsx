@@ -8,14 +8,35 @@ import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Network } from '@/network'
-import { BookOpen, Lightbulb, RefreshCw, Plus, FileText, Trash2, FolderOpen, Search, Globe, Download, ChevronDown, ChevronUp, FileSearch, BookOpenCheck, Save, Send, Pencil, Check, X, MessageCircle, ShieldCheck } from 'lucide-react-taro'
+import { BookOpen, Lightbulb, RefreshCw, Plus, FileText, Trash2, FolderOpen, Search, Globe, Download, ChevronDown, ChevronUp, FileSearch, BookOpenCheck, Save, Send, MessageCircle, ShieldCheck } from 'lucide-react-taro'
+
+interface CoreQuestion {
+  dimension: string
+  dimension_key: string
+  adult_version: string
+  child_version: string
+  why_ask: string
+  follow_up: string
+}
+
+interface TipsData {
+  people: string[]
+  time: string[]
+  place: string[]
+  practice: string[]
+  change: string[]
+  dialect: string[]
+  special: string[]
+}
 
 interface InterviewPlan {
   id: string
   context_summary: string | null
-  adult_questions: string[] | null
-  child_questions: string[] | null
-  tips: string[] | null
+  selected_dimensions: string[] | null
+  warmup_questions: string[] | null
+  core_questions: CoreQuestion[] | null
+  closing_questions: string[] | null
+  tips: TipsData | null
   status?: string
 }
 
@@ -59,6 +80,21 @@ const InterviewPlanPage = () => {
   const router = useRouter()
   const topicId = router.params.topicId || ''
 
+  // 追问锦囊分类渲染
+  const renderTipsCategory = (label: string, items: string[] | undefined) => {
+    if (!items || items.length === 0) return null
+    return (
+      <View className="mb-3">
+        <Text className="block text-sm font-medium text-stone-700 mb-1">{label}</Text>
+        <View className="space-y-1 ml-1">
+          {items.map((tip, i) => (
+            <Text key={i} className="block text-xs text-stone-600">· {tip}</Text>
+          ))}
+        </View>
+      </View>
+    )
+  }
+
   const [plan, setPlan] = useState<InterviewPlan | null>(null)
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -93,11 +129,6 @@ const InterviewPlanPage = () => {
   const [feedback, setFeedback] = useState('')
   const [refining, setRefining] = useState(false)
   const [showDiscussion, setShowDiscussion] = useState(false)
-
-  // 问题编辑状态
-  const [editingType, setEditingType] = useState<'adult' | 'child' | 'tip' | null>(null)
-  const [editingIndex, setEditingIndex] = useState<number>(-1)
-  const [editText, setEditText] = useState('')
 
   // 加载话题名称和资料列表
   useEffect(() => {
@@ -408,35 +439,6 @@ const InterviewPlanPage = () => {
       console.error('定稿失败:', err)
       Taro.showToast({ title: '定稿失败，请重试', icon: 'none' })
     }
-  }
-
-  const handleStartEdit = (type: 'adult' | 'child' | 'tip', index: number, text: string) => {
-    setEditingType(type)
-    setEditingIndex(index)
-    setEditText(text)
-  }
-
-  const handleSaveEdit = () => {
-    if (!plan || editingType === null || editingIndex < 0) return
-    const updated = { ...plan }
-    const key = editingType === 'adult' ? 'adult_questions' : editingType === 'child' ? 'child_questions' : 'tips'
-    const arr = [...(updated[key] || [])]
-    arr[editingIndex] = editText.trim() || arr[editingIndex]
-    updated[key] = arr
-    setPlan(updated)
-    setEditingType(null)
-    setEditingIndex(-1)
-    setEditText('')
-  }
-
-  const handleDeleteQuestion = (type: 'adult' | 'child' | 'tip', index: number) => {
-    if (!plan) return
-    const updated = { ...plan }
-    const key = type === 'adult' ? 'adult_questions' : type === 'child' ? 'child_questions' : 'tips'
-    const arr = [...(updated[key] || [])]
-    arr.splice(index, 1)
-    updated[key] = arr
-    setPlan(updated)
   }
 
   const getSourceLabel = (source: string) => {
@@ -990,115 +992,44 @@ const InterviewPlanPage = () => {
             </Card>
           )}
 
-          {/* 大人版问题 */}
-          {plan.adult_questions && plan.adult_questions.length > 0 && (
+          {/* 选用维度 */}
+          {plan.selected_dimensions && plan.selected_dimensions.length > 0 && (
             <Card className="border-stone-100 bg-white">
               <CardContent className="p-4">
                 <Text className="block text-base font-semibold text-stone-800 mb-3">
-                  🧑 大人备用版
+                  🎯 选用维度
                 </Text>
                 <Text className="block text-xs text-stone-400 mb-3">
-                  心里有数就行，不需要直接问
+                  从10个采访镜头中选了这些，像调镜头一样远近高低各不同
                 </Text>
-                <View className="space-y-2">
-                  {plan.adult_questions.map((q, i) => (
-                    <View key={i} className="flex items-start gap-2">
-                      <Text className="block text-sm font-medium text-amber-700 mt-1 flex-shrink-0">
-                        {i + 1}.
-                      </Text>
-                      {editingType === 'adult' && editingIndex === i ? (
-                        <View className="flex-1 space-y-2">
-                          <View className="bg-stone-50 rounded-lg p-2">
-                            <Textarea
-                              style={{ width: '100%', minHeight: '60px', backgroundColor: 'transparent' }}
-                              value={editText}
-                              onInput={(e) => setEditText(e.detail.value)}
-                            />
-                          </View>
-                          <View className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => setEditingType(null)}>
-                              <X size={12} color="#78716C" className="mr-1" />
-                              <Text className="text-xs">取消</Text>
-                            </Button>
-                            <Button size="sm" className="bg-amber-700 text-white" onClick={handleSaveEdit}>
-                              <Check size={12} color="#fff" className="mr-1" />
-                              <Text className="text-xs">保存</Text>
-                            </Button>
-                          </View>
-                        </View>
-                      ) : (
-                        <View className="flex-1 flex items-start justify-between gap-2">
-                          <Text className="block text-sm text-stone-700 flex-1">{q}</Text>
-                          {plan.status !== 'final' && (
-                            <View className="flex items-center gap-1 flex-shrink-0">
-                              <Button variant="ghost" size="sm" onClick={() => handleStartEdit('adult', i, q)}>
-                                <Pencil size={12} color="#B45309" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDeleteQuestion('adult', i)}>
-                                <Trash2 size={12} color="#9CA3AF" />
-                              </Button>
-                            </View>
-                          )}
-                        </View>
-                      )}
-                    </View>
+                <View className="flex flex-wrap gap-2">
+                  {plan.selected_dimensions.map((dim, i) => (
+                    <Badge key={i} className="bg-amber-50 text-amber-800 border-amber-200">
+                      {dim}
+                    </Badge>
                   ))}
                 </View>
               </CardContent>
             </Card>
           )}
 
-          {/* 孩子版问题 */}
-          {plan.child_questions && plan.child_questions.length > 0 && (
-            <Card className="border-lime-100 bg-lime-50">
+          {/* 热身问题 */}
+          {plan.warmup_questions && plan.warmup_questions.length > 0 && (
+            <Card className="border-stone-100 bg-white">
               <CardContent className="p-4">
-                <Text className="block text-base font-semibold text-stone-800 mb-3">
-                  👧 小孩执行版
+                <Text className="block text-base font-semibold text-stone-800 mb-2">
+                  ☕ 热身问题
                 </Text>
                 <Text className="block text-xs text-stone-400 mb-3">
-                  直接问就行，简单口语化
+                  让老人放松，知道「我随便聊聊就行」
                 </Text>
                 <View className="space-y-2">
-                  {plan.child_questions.map((q, i) => (
+                  {plan.warmup_questions.map((q, i) => (
                     <View key={i} className="flex items-start gap-2">
-                      <Text className="block text-sm font-medium text-lime-800 mt-1 flex-shrink-0">
-                        {i + 1}.
+                      <Text className="block text-sm font-medium text-stone-500 mt-1 flex-shrink-0">
+                        W{i + 1}.
                       </Text>
-                      {editingType === 'child' && editingIndex === i ? (
-                        <View className="flex-1 space-y-2">
-                          <View className="bg-white rounded-lg p-2">
-                            <Textarea
-                              style={{ width: '100%', minHeight: '60px', backgroundColor: 'transparent' }}
-                              value={editText}
-                              onInput={(e) => setEditText(e.detail.value)}
-                            />
-                          </View>
-                          <View className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => setEditingType(null)}>
-                              <X size={12} color="#78716C" className="mr-1" />
-                              <Text className="text-xs">取消</Text>
-                            </Button>
-                            <Button size="sm" className="bg-lime-800 text-white" onClick={handleSaveEdit}>
-                              <Check size={12} color="#fff" className="mr-1" />
-                              <Text className="text-xs">保存</Text>
-                            </Button>
-                          </View>
-                        </View>
-                      ) : (
-                        <View className="flex-1 flex items-start justify-between gap-2">
-                          <Text className="block text-sm text-stone-700 flex-1">{q}</Text>
-                          {plan.status !== 'final' && (
-                            <View className="flex items-center gap-1 flex-shrink-0">
-                              <Button variant="ghost" size="sm" onClick={() => handleStartEdit('child', i, q)}>
-                                <Pencil size={12} color="#4D7C0F" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDeleteQuestion('child', i)}>
-                                <Trash2 size={12} color="#9CA3AF" />
-                              </Button>
-                            </View>
-                          )}
-                        </View>
-                      )}
+                      <Text className="block text-sm text-stone-700">{q}</Text>
                     </View>
                   ))}
                 </View>
@@ -1106,8 +1037,128 @@ const InterviewPlanPage = () => {
             </Card>
           )}
 
-          {/* 追问锦囊 */}
-          {plan.tips && plan.tips.length > 0 && (
+          {/* 核心问题（按维度分组） */}
+          {plan.core_questions && plan.core_questions.length > 0 && (
+            <View className="space-y-3">
+              <Text className="block text-base font-semibold text-stone-800 px-1">
+                📝 核心问题
+              </Text>
+              {plan.core_questions.map((q, i) => (
+                <Card key={i} className="border-stone-100 bg-white">
+                  <CardContent className="p-4">
+                    {/* 维度标签 */}
+                    <View className="flex items-center gap-2 mb-3">
+                      <Badge className="bg-amber-50 text-amber-800 border-amber-200">
+                        {q.dimension}
+                      </Badge>
+                      <Text className="block text-xs text-stone-400">Q{i + 1}</Text>
+                    </View>
+
+                    {/* 大人版 */}
+                    <View className="mb-3">
+                      <Text className="block text-xs font-medium text-amber-700 mb-1">
+                        🧑 大人备用版
+                      </Text>
+                      <Text className="block text-sm text-stone-700">{q.adult_version}</Text>
+                    </View>
+
+                    {/* 小孩版 */}
+                    <View className="mb-3 p-3 bg-lime-50 rounded-lg">
+                      <Text className="block text-xs font-medium text-lime-800 mb-1">
+                        👧 小孩执行版
+                      </Text>
+                      <Text className="block text-sm text-stone-700">{q.child_version}</Text>
+                    </View>
+
+                    {/* 为什么问 */}
+                    <View className="mb-2">
+                      <Text className="block text-xs font-medium text-stone-500 mb-1">
+                        为什么问这个
+                      </Text>
+                      <Text className="block text-xs text-stone-600 italic">{q.why_ask}</Text>
+                    </View>
+
+                    {/* 追问方向 */}
+                    <View>
+                      <Text className="block text-xs font-medium text-stone-500 mb-1">
+                        追问方向
+                      </Text>
+                      <Text className="block text-xs text-stone-600">{q.follow_up}</Text>
+                    </View>
+                  </CardContent>
+                </Card>
+              ))}
+            </View>
+          )}
+
+          {/* 收尾问题 */}
+          {plan.closing_questions && plan.closing_questions.length > 0 && (
+            <Card className="border-stone-100 bg-white">
+              <CardContent className="p-4">
+                <Text className="block text-base font-semibold text-stone-800 mb-2">
+                  🌅 收尾问题
+                </Text>
+                <Text className="block text-xs text-stone-400 mb-3">
+                  意义 + 传承 + 寄语
+                </Text>
+                <View className="space-y-2">
+                  {plan.closing_questions.map((q, i) => (
+                    <View key={i} className="flex items-start gap-2">
+                      <Text className="block text-sm font-medium text-stone-500 mt-1 flex-shrink-0">
+                        {i + 1}.
+                      </Text>
+                      <Text className="block text-sm text-stone-700">{q}</Text>
+                    </View>
+                  ))}
+                </View>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 追问锦囊（分类展示） */}
+          {plan.tips && typeof plan.tips === 'object' && !Array.isArray(plan.tips) && (
+            <Card className="border-amber-100 bg-amber-50">
+              <CardContent className="p-4">
+                <View className="flex items-center gap-2 mb-3">
+                  <Lightbulb size={18} color="#B45309" />
+                  <Text className="block text-base font-semibold text-stone-800">
+                    追问锦囊
+                  </Text>
+                </View>
+                <Text className="block text-xs text-stone-500 mb-4">
+                  不是背出来的，是听老人说的时候现抓的
+                </Text>
+
+                {/* 6类常规追问 */}
+                {renderTipsCategory('👤 人物追问', plan.tips.people)}
+                {renderTipsCategory('⏰ 时间追问', plan.tips.time)}
+                {renderTipsCategory('📍 地点追问', plan.tips.place)}
+                {renderTipsCategory('🔧 做法追问', plan.tips.practice)}
+                {renderTipsCategory('🔄 变化追问', plan.tips.change)}
+                {renderTipsCategory('🗣️ 方言追问', plan.tips.dialect)}
+
+                {/* 3种特殊场景 */}
+                {plan.tips.special && plan.tips.special.length > 0 && (
+                  <View className="mt-4 pt-4 border-t border-amber-200">
+                    <Text className="block text-sm font-semibold text-stone-800 mb-2">
+                      ⚡ 特殊场景
+                    </Text>
+                    <View className="space-y-2">
+                      {plan.tips.special.map((tip, i) => (
+                        <View key={i} className="flex items-start gap-2">
+                          <Text className="text-sm">💡</Text>
+                          <Text className="block text-sm text-stone-700">{tip}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 兼容旧版 tips 格式（数组） */}
+          {plan.tips && Array.isArray(plan.tips) && plan.tips.length > 0 && (
             <Card className="border-amber-100 bg-amber-50">
               <CardContent className="p-4">
                 <View className="flex items-center gap-2 mb-3">
@@ -1120,41 +1171,7 @@ const InterviewPlanPage = () => {
                   {plan.tips.map((tip, i) => (
                     <View key={i} className="flex items-start gap-2">
                       <Text className="text-sm">💡</Text>
-                      {editingType === 'tip' && editingIndex === i ? (
-                        <View className="flex-1 space-y-2">
-                          <View className="bg-white rounded-lg p-2">
-                            <Textarea
-                              style={{ width: '100%', minHeight: '60px', backgroundColor: 'transparent' }}
-                              value={editText}
-                              onInput={(e) => setEditText(e.detail.value)}
-                            />
-                          </View>
-                          <View className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => setEditingType(null)}>
-                              <X size={12} color="#78716C" className="mr-1" />
-                              <Text className="text-xs">取消</Text>
-                            </Button>
-                            <Button size="sm" className="bg-amber-700 text-white" onClick={handleSaveEdit}>
-                              <Check size={12} color="#fff" className="mr-1" />
-                              <Text className="text-xs">保存</Text>
-                            </Button>
-                          </View>
-                        </View>
-                      ) : (
-                        <View className="flex-1 flex items-start justify-between gap-2">
-                          <Text className="block text-sm text-stone-700 flex-1">{tip}</Text>
-                          {plan.status !== 'final' && (
-                            <View className="flex items-center gap-1 flex-shrink-0">
-                              <Button variant="ghost" size="sm" onClick={() => handleStartEdit('tip', i, tip)}>
-                                <Pencil size={12} color="#B45309" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDeleteQuestion('tip', i)}>
-                                <Trash2 size={12} color="#9CA3AF" />
-                              </Button>
-                            </View>
-                          )}
-                        </View>
-                      )}
+                      <Text className="block text-sm text-stone-700">{tip}</Text>
                     </View>
                   ))}
                 </View>
