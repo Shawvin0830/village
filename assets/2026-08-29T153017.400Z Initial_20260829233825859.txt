@@ -1,0 +1,387 @@
+2026-08-29T15:30:17.400Z	Initializing build environment...
+2026-08-29T15:30:19.764Z	Success: Finished initializing build environment
+2026-08-29T15:30:20.653Z	Cloning repository...
+2026-08-29T15:30:23.563Z	Restoring from dependencies cache
+2026-08-29T15:30:23.565Z	Restoring from build output cache
+2026-08-29T15:30:25.128Z	Detected the following tools from environment: pnpm@9.0.0, nodejs@24.18.0
+2026-08-29T15:30:26.313Z	Installing project dependencies: pnpm install --frozen-lockfile
+2026-08-29T15:30:26.945Z	Scope: all 2 workspace projects
+2026-08-29T15:30:26.955Z	(node:833) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-08-29T15:30:26.956Z	(Use `node --trace-deprecation ...` to show where the warning was created)
+2026-08-29T15:31:28.993Z	.../node_modules/@swc/core postinstall$ node postinstall.js
+2026-08-29T15:31:28.994Z	.../node_modules/@parcel/watcher install$ node scripts/build-from-source.js
+2026-08-29T15:31:28.994Z	.../node_modules/@swc/core postinstall$ node postinstall.js
+2026-08-29T15:31:28.995Z	.../node_modules/@tarojs/binding postinstall$ node postinstall.js
+2026-08-29T15:31:29.080Z	.../node_modules/@parcel/watcher install: Done
+2026-08-29T15:31:29.089Z	.../esbuild@0.25.12/node_modules/esbuild postinstall$ node install.js
+2026-08-29T15:31:29.137Z	.../core-js@2.6.12/node_modules/core-js postinstall$ node -e "try{require('./postinstall')}catch(e){}"
+2026-08-29T15:31:29.165Z	.../node_modules/@swc/core postinstall: Done
+2026-08-29T15:31:29.170Z	.../node_modules/@tarojs/binding postinstall: Done
+2026-08-29T15:31:29.195Z	.../node_modules/@swc/core postinstall: Done
+2026-08-29T15:31:29.209Z	.../core-js@3.47.0/node_modules/core-js postinstall$ node -e "try{require('./postinstall')}catch(e){}"
+2026-08-29T15:31:29.225Z	.../esbuild@0.25.12/node_modules/esbuild postinstall: Done
+2026-08-29T15:31:29.229Z	.../node_modules/protobufjs postinstall$ node scripts/postinstall
+2026-08-29T15:31:29.250Z	.../core-js@2.6.12/node_modules/core-js postinstall: Done
+2026-08-29T15:31:29.256Z	.../.pnpm/less@4.5.1/node_modules/less postinstall$ node scripts/postinstall.js
+2026-08-29T15:31:29.280Z	.../node_modules/core-js-pure postinstall$ node -e "try{require('./postinstall')}catch(e){}"
+2026-08-29T15:31:29.285Z	.../core-js@3.47.0/node_modules/core-js postinstall: Done
+2026-08-29T15:31:29.308Z	.../node_modules/protobufjs postinstall: Done
+2026-08-29T15:31:29.352Z	.../.pnpm/less@4.5.1/node_modules/less postinstall: Done
+2026-08-29T15:31:29.358Z	.../node_modules/core-js-pure postinstall: Done
+2026-08-29T15:31:29.390Z	.../node_modules/weapp-tailwindcss postinstall$ node bin/weapp-tailwindcss.js patch
+2026-08-29T15:31:29.526Z	.../sharp@0.33.5/node_modules/sharp install$ node install/check
+2026-08-29T15:31:29.686Z	.../sharp@0.33.5/node_modules/sharp install: Done
+2026-08-29T15:31:29.748Z	.../node_modules/@nestjs/core postinstall$ opencollective || exit 0
+2026-08-29T15:31:29.784Z	.../node_modules/better-sqlite3 install$ prebuild-install || node-gyp rebuild --release
+2026-08-29T15:31:30.043Z	.../node_modules/@nestjs/core postinstall: Done
+2026-08-29T15:31:30.113Z	.../node_modules/better-sqlite3 install: (node:1073) [DEP0176] DeprecationWarning: fs.R_OK is deprecated, use fs.constants.R_OK instead
+2026-08-29T15:31:30.114Z	.../node_modules/better-sqlite3 install: (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-08-29T15:31:30.179Z	.../node_modules/weapp-tailwindcss postinstall: [info] 未找到当前子包的 Tailwind CSS 目标记录，正在生成。
+2026-08-29T15:31:30.180Z	.../node_modules/weapp-tailwindcss postinstall: [info] weapp-tw patch 绑定 Tailwind CSS -> /opt/buildhome/repo/node_modules/.pnpm/tailwindcss@4.1.18/node_modules/tailwindcss (v4.1.18)
+2026-08-29T15:31:30.192Z	.../node_modules/weapp-tailwindcss postinstall: [success] Patched Tailwind CSS length unit list (v4).
+2026-08-29T15:31:30.205Z	.../node_modules/weapp-tailwindcss postinstall: [info] 记录 weapp-tw patch 目标 -> ./node_modules/.cache/weapp-tailwindcss/7f4c1def76e4c363bf671552b17d4bbd/tailwindcss-target.json
+2026-08-29T15:31:30.205Z	.../node_modules/weapp-tailwindcss postinstall: [success] Tailwind CSS 运行时补丁已完成。
+2026-08-29T15:31:30.216Z	.../node_modules/weapp-tailwindcss postinstall: Done
+2026-08-29T15:31:33.351Z	.../node_modules/better-sqlite3 install: make: Entering directory '/opt/buildhome/repo/node_modules/.pnpm/better-sqlite3@11.10.0/node_modules/better-sqlite3/build'
+2026-08-29T15:31:33.351Z	.../node_modules/better-sqlite3 install:   TOUCH ba23eeee118cd63e16015df367567cb043fed872.intermediate
+2026-08-29T15:31:33.357Z	.../node_modules/better-sqlite3 install:   ACTION deps_sqlite3_gyp_locate_sqlite3_target_copy_builtin_sqlite3 ba23eeee118cd63e16015df367567cb043fed872.intermediate
+2026-08-29T15:31:33.413Z	.../node_modules/better-sqlite3 install:   TOUCH Release/obj.target/deps/locate_sqlite3.stamp
+2026-08-29T15:31:33.418Z	.../node_modules/better-sqlite3 install:   CC(target) Release/obj.target/sqlite3/gen/sqlite3/sqlite3.o
+2026-08-29T15:32:49.774Z	.../node_modules/better-sqlite3 install: rm -f Release/obj.target/deps/sqlite3.a Release/obj.target/deps/sqlite3.a.ar-file-list; mkdir -p `dirname Release/obj.target/deps/sqlite3.a`
+2026-08-29T15:32:49.779Z	.../node_modules/better-sqlite3 install: ar crs Release/obj.target/deps/sqlite3.a @Release/obj.target/deps/sqlite3.a.ar-file-list
+2026-08-29T15:32:49.793Z	.../node_modules/better-sqlite3 install:   COPY Release/sqlite3.a
+2026-08-29T15:32:49.798Z	.../node_modules/better-sqlite3 install:   CXX(target) Release/obj.target/better_sqlite3/src/better_sqlite3.o
+2026-08-29T15:32:51.206Z	.../node_modules/better-sqlite3 install: In file included from ./src/better_sqlite3.lzz:11,
+2026-08-29T15:32:51.206Z	.../node_modules/better-sqlite3 install:                  from ../src/better_sqlite3.cpp:4:
+2026-08-29T15:32:51.206Z	.../node_modules/better-sqlite3 install: /opt/buildhome/.cache/node-gyp/24.18.0/include/node/node.h:1392:7: warning: cast between incompatible function types from 'void (*)(v8::Local<v8::Object>, v8::Local<v8::Value>, v8::Local<v8::Context>)' to 'node::addon_context_register_func' {aka 'void (*)(v8::Local<v8::Object>, v8::Local<v8::Value>, v8::Local<v8::Context>, void*)'} [-Wcast-function-type]
+2026-08-29T15:32:51.206Z	.../node_modules/better-sqlite3 install:  1392 |       (node::addon_context_register_func) (regfunc),                  \
+2026-08-29T15:32:51.206Z	.../node_modules/better-sqlite3 install:       |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2026-08-29T15:32:51.206Z	.../node_modules/better-sqlite3 install: /opt/buildhome/.cache/node-gyp/24.18.0/include/node/node.h:1410:3: note: in expansion of macro 'NODE_MODULE_CONTEXT_AWARE_X'
+2026-08-29T15:32:51.206Z	.../node_modules/better-sqlite3 install:  1410 |   NODE_MODULE_CONTEXT_AWARE_X(modname, regfunc, NULL, 0)
+2026-08-29T15:32:51.206Z	.../node_modules/better-sqlite3 install:       |   ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+2026-08-29T15:32:51.206Z	.../node_modules/better-sqlite3 install: /opt/buildhome/.cache/node-gyp/24.18.0/include/node/node.h:1441:3: note: in expansion of macro 'NODE_MODULE_CONTEXT_AWARE'
+2026-08-29T15:32:51.206Z	.../node_modules/better-sqlite3 install:  1441 |   NODE_MODULE_CONTEXT_AWARE(NODE_GYP_MODULE_NAME,                     \
+2026-08-29T15:32:51.206Z	.../node_modules/better-sqlite3 install:       |   ^~~~~~~~~~~~~~~~~~~~~~~~~
+2026-08-29T15:32:51.206Z	.../node_modules/better-sqlite3 install: ./src/better_sqlite3.lzz:67:1: note: in expansion of macro 'NODE_MODULE_INIT'
+2026-08-29T15:32:51.242Z	.../node_modules/better-sqlite3 install: ./src/objects/database.lzz: In static member function 'static void Database::JS_new(const v8::FunctionCallbackInfo<v8::Value>&)':
+2026-08-29T15:32:51.242Z	.../node_modules/better-sqlite3 install: ./src/objects/database.lzz:180:21: warning: variable 'status' set but not used [-Wunused-but-set-variable]
+2026-08-29T15:32:51.273Z	.../node_modules/better-sqlite3 install: ./src/util/custom-table.lzz: At global scope:
+2026-08-29T15:32:51.273Z	.../node_modules/better-sqlite3 install: ./src/util/custom-table.lzz:45:9: warning: missing initializer for member 'sqlite3_module::xIntegrity' [-Wmissing-field-initializers]
+2026-08-29T15:32:51.273Z	.../node_modules/better-sqlite3 install: ./src/util/custom-table.lzz:72:9: warning: missing initializer for member 'sqlite3_module::xIntegrity' [-Wmissing-field-initializers]
+2026-08-29T15:32:51.563Z	.../node_modules/better-sqlite3 install: ./src/util/data.lzz: In function 'v8::Local<v8::Value> Data::GetValueJS(v8::Isolate*, sqlite3_stmt*, int, bool)':
+2026-08-29T15:32:51.563Z	.../node_modules/better-sqlite3 install: ./src/util/data.lzz:73:92: warning: this statement may fall through [-Wimplicit-fallthrough=]
+2026-08-29T15:32:51.563Z	.../node_modules/better-sqlite3 install: ./src/util/data.lzz:73:197: note: here
+2026-08-29T15:32:51.563Z	.../node_modules/better-sqlite3 install: ./src/util/data.lzz: In function 'v8::Local<v8::Value> Data::GetValueJS(v8::Isolate*, sqlite3_value*, bool)':
+2026-08-29T15:32:51.563Z	.../node_modules/better-sqlite3 install: ./src/util/data.lzz:77:81: warning: this statement may fall through [-Wimplicit-fallthrough=]
+2026-08-29T15:32:51.563Z	.../node_modules/better-sqlite3 install: ./src/util/data.lzz:77:175: note: here
+2026-08-29T15:32:53.368Z	.../node_modules/better-sqlite3 install:   SOLINK_MODULE(target) Release/obj.target/better_sqlite3.node
+2026-08-29T15:32:53.460Z	.../node_modules/better-sqlite3 install:   COPY Release/better_sqlite3.node
+2026-08-29T15:32:53.466Z	.../node_modules/better-sqlite3 install:   CC(target) Release/obj.target/test_extension/deps/test_extension.o
+2026-08-29T15:32:53.507Z	.../node_modules/better-sqlite3 install:   SOLINK_MODULE(target) Release/obj.target/test_extension.node
+2026-08-29T15:32:53.535Z	.../node_modules/better-sqlite3 install:   COPY Release/test_extension.node
+2026-08-29T15:32:53.540Z	.../node_modules/better-sqlite3 install: rm ba23eeee118cd63e16015df367567cb043fed872.intermediate
+2026-08-29T15:32:53.540Z	.../node_modules/better-sqlite3 install: make: Leaving directory '/opt/buildhome/repo/node_modules/.pnpm/better-sqlite3@11.10.0/node_modules/better-sqlite3/build'
+2026-08-29T15:32:53.559Z	.../node_modules/better-sqlite3 install: Done
+2026-08-29T15:32:53.657Z	.../node_modules/@tarojs/cli postinstall$ node postinstall.js
+2026-08-29T15:32:58.787Z	.../node_modules/@tarojs/cli postinstall: Done
+2026-08-29T15:32:59.031Z	
+2026-08-29T15:32:59.032Z	dependencies:
+2026-08-29T15:32:59.032Z	+ @babel/runtime 7.28.4
+2026-08-29T15:32:59.032Z	+ @tarojs/components 4.1.9
+2026-08-29T15:32:59.032Z	+ @tarojs/helper 4.1.9
+2026-08-29T15:32:59.032Z	+ @tarojs/plugin-framework-react 4.1.9
+2026-08-29T15:32:59.032Z	+ @tarojs/plugin-platform-h5 4.1.9
+2026-08-29T15:32:59.032Z	+ @tarojs/plugin-platform-tt 4.1.9
+2026-08-29T15:32:59.033Z	+ @tarojs/plugin-platform-weapp 4.1.9
+2026-08-29T15:32:59.033Z	+ @tarojs/react 4.1.9
+2026-08-29T15:32:59.033Z	+ @tarojs/runtime 4.1.9
+2026-08-29T15:32:59.034Z	+ @tarojs/shared 4.1.9
+2026-08-29T15:32:59.034Z	+ @tarojs/taro 4.1.9
+2026-08-29T15:32:59.036Z	+ class-variance-authority 0.7.1
+2026-08-29T15:32:59.040Z	+ clsx 2.1.1
+2026-08-29T15:32:59.040Z	+ date-fns 4.1.0
+2026-08-29T15:32:59.041Z	+ lucide-react-taro 1.4.1
+2026-08-29T15:32:59.041Z	+ react 18.3.1
+2026-08-29T15:32:59.041Z	+ react-dom 18.3.1
+2026-08-29T15:32:59.041Z	+ tailwind-merge 3.5.0
+2026-08-29T15:32:59.041Z	+ tailwindcss-animate 1.0.7
+2026-08-29T15:32:59.041Z	+ zustand 5.0.9
+2026-08-29T15:32:59.041Z	
+2026-08-29T15:32:59.041Z	devDependencies:
+2026-08-29T15:32:59.041Z	+ @babel/core 7.28.5
+2026-08-29T15:32:59.041Z	+ @babel/plugin-transform-class-properties 7.25.9
+2026-08-29T15:32:59.041Z	+ @babel/preset-react 7.28.5
+2026-08-29T15:32:59.041Z	+ @eslint/eslintrc 3.3.3
+2026-08-29T15:32:59.041Z	+ @tailwindcss/postcss 4.1.18
+2026-08-29T15:32:59.041Z	+ @tarojs/cli 4.1.9
+2026-08-29T15:32:59.041Z	+ @tarojs/plugin-generator 4.1.9
+2026-08-29T15:32:59.041Z	+ @tarojs/plugin-mini-ci 4.1.9
+2026-08-29T15:32:59.041Z	+ @tarojs/vite-runner 4.1.9
+2026-08-29T15:32:59.041Z	+ @types/minimatch 5.1.2
+2026-08-29T15:32:59.041Z	+ @types/node 24.12.4
+2026-08-29T15:32:59.041Z	+ @types/react 18.3.27
+2026-08-29T15:32:59.041Z	+ @vitejs/plugin-react 4.7.0
+2026-08-29T15:32:59.041Z	+ babel-preset-taro 4.1.9
+2026-08-29T15:32:59.041Z	+ concurrently 9.2.1
+2026-08-29T15:32:59.041Z	+ dotenv 17.2.3
+2026-08-29T15:32:59.042Z	+ eslint 8.57.1
+2026-08-29T15:32:59.042Z	+ eslint-config-taro 4.1.9
+2026-08-29T15:32:59.042Z	+ eslint-plugin-react 7.37.5
+2026-08-29T15:32:59.042Z	+ eslint-plugin-react-hooks 4.6.2
+2026-08-29T15:32:59.042Z	+ eslint-plugin-tailwindcss 3.18.3
+2026-08-29T15:32:59.042Z	+ less 4.5.1
+2026-08-29T15:32:59.042Z	+ lint-staged 16.2.7
+2026-08-29T15:32:59.042Z	+ miniprogram-ci 2.1.26
+2026-08-29T15:32:59.042Z	+ only-allow 1.2.2
+2026-08-29T15:32:59.042Z	+ postcss 8.5.6
+2026-08-29T15:32:59.042Z	+ react-refresh 0.14.2
+2026-08-29T15:32:59.042Z	+ stylelint 16.26.1
+2026-08-29T15:32:59.042Z	+ stylelint-config-standard 38.0.0
+2026-08-29T15:32:59.042Z	+ tailwindcss 4.1.18
+2026-08-29T15:32:59.042Z	+ terser 5.44.1
+2026-08-29T15:32:59.042Z	+ tt-ide-cli 0.1.31
+2026-08-29T15:32:59.042Z	+ typescript 5.9.3
+2026-08-29T15:32:59.042Z	+ vite 4.5.14
+2026-08-29T15:32:59.042Z	+ weapp-tailwindcss 4.10.3
+2026-08-29T15:32:59.042Z	
+2026-08-29T15:32:59.112Z	. postinstall$ weapp-tw patch
+2026-08-29T15:32:59.684Z	. postinstall: [info] 未找到当前子包的 Tailwind CSS 目标记录，正在生成。
+2026-08-29T15:32:59.684Z	. postinstall: [info] weapp-tw patch 绑定 Tailwind CSS -> node_modules/.pnpm/tailwindcss@4.1.18/node_modules/tailwindcss (v4.1.18)
+2026-08-29T15:32:59.705Z	. postinstall: [info] 记录 weapp-tw patch 目标 -> ./node_modules/.cache/weapp-tailwindcss/9ae838383d1178f23428f538db5898a8/tailwindcss-target.json
+2026-08-29T15:32:59.705Z	. postinstall: [success] Tailwind CSS 运行时补丁已完成。
+2026-08-29T15:32:59.719Z	. postinstall: Done
+2026-08-29T15:32:59.720Z	Done in 2m 33.2s
+2026-08-29T15:33:00.067Z	Executing user build command: pnpm run build
+2026-08-29T15:33:00.487Z	
+2026-08-29T15:33:00.487Z	> coze-mini-program@1.0.0 build /opt/buildhome/repo
+2026-08-29T15:33:00.487Z	> pnpm exec concurrently --kill-others-on-fail --kill-signal SIGKILL -n lint,tsc,web,weapp,tt,server -c red,blue,green,yellow,cyan,magenta "pnpm lint:build" "pnpm tsc" "pnpm build:web" "pnpm build:weapp" "pnpm build:tt" "pnpm build:server"
+2026-08-29T15:33:00.487Z	
+2026-08-29T15:33:01.922Z	[tt] 
+2026-08-29T15:33:01.923Z	[tt] > coze-mini-program@1.0.0 build:tt /opt/buildhome/repo
+2026-08-29T15:33:01.923Z	[tt] > taro build --type tt
+2026-08-29T15:33:01.923Z	[tt] 
+2026-08-29T15:33:01.945Z	[web] 
+2026-08-29T15:33:01.946Z	[web] > coze-mini-program@1.0.0 build:web /opt/buildhome/repo
+2026-08-29T15:33:01.946Z	[web] > taro build --type h5
+2026-08-29T15:33:01.946Z	[web] 
+2026-08-29T15:33:01.986Z	[weapp] 
+2026-08-29T15:33:01.986Z	[weapp] > coze-mini-program@1.0.0 build:weapp /opt/buildhome/repo
+2026-08-29T15:33:01.986Z	[weapp] > taro build --type weapp
+2026-08-29T15:33:01.986Z	[weapp] 
+2026-08-29T15:33:02.074Z	[lint] 
+2026-08-29T15:33:02.074Z	[lint] > coze-mini-program@1.0.0 lint:build /opt/buildhome/repo
+2026-08-29T15:33:02.074Z	[lint] > eslint "src/**/*.{js,jsx,ts,tsx,css}" --max-warnings=0 --quiet
+2026-08-29T15:33:02.075Z	[lint] 
+2026-08-29T15:33:02.129Z	[tsc] 
+2026-08-29T15:33:02.129Z	[tsc] > coze-mini-program@1.0.0 tsc /opt/buildhome/repo
+2026-08-29T15:33:02.129Z	[tsc] > npx tsc --noEmit --skipLibCheck
+2026-08-29T15:33:02.129Z	[tsc] 
+2026-08-29T15:33:02.136Z	[server] 
+2026-08-29T15:33:02.137Z	[server] > coze-mini-program@1.0.0 build:server /opt/buildhome/repo
+2026-08-29T15:33:02.137Z	[server] > pnpm --filter server build
+2026-08-29T15:33:02.137Z	[server] 
+2026-08-29T15:33:02.498Z	[weapp] 👽 Taro v4.1.9
+2026-08-29T15:33:02.499Z	[weapp] 
+2026-08-29T15:33:02.886Z	[web] 👽 Taro v4.1.9
+2026-08-29T15:33:02.886Z	[web] 
+2026-08-29T15:33:02.929Z	[tt] 👽 Taro v4.1.9
+2026-08-29T15:33:02.929Z	[tt] 
+2026-08-29T15:33:03.545Z	[server] 
+2026-08-29T15:33:03.545Z	[server] > server@1.0.0 build /opt/buildhome/repo/server
+2026-08-29T15:33:03.546Z	[server] > nest build
+2026-08-29T15:33:03.546Z	[server] 
+2026-08-29T15:33:06.125Z	[weapp] [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+2026-08-29T15:33:06.243Z	[weapp] [info] tailwindcss-patcher 绑定 Tailwind CSS -> node_modules/.pnpm/@tailwindcss+postcss@4.1.18/node_modules/@tailwindcss/postcss (v4.1.18)
+2026-08-29T15:33:06.244Z	[weapp] [success] 当前使用 Tailwind CSS 版本为: 4.1.18
+2026-08-29T15:33:06.271Z	[weapp] Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+2026-08-29T15:33:06.272Z	[weapp]   npx update-browserslist-db@latest
+2026-08-29T15:33:06.272Z	[weapp]   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-08-29T15:33:06.415Z	[web] [dotenv@17.2.3] injecting env (0) from .env.local -- tip: ⚙️  write to custom object with { processEnv: myObject }
+2026-08-29T15:33:06.532Z	[weapp] [info] 检测到 Tailwind CSS 目标记录与当前解析结果不一致，正在自动重新 patch 并刷新缓存。
+2026-08-29T15:33:06.567Z	[weapp] [success] Patched Tailwind CSS length unit list (v4).
+2026-08-29T15:33:06.838Z	[tt] [dotenv@17.2.3] injecting env (0) from .env.local -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
+2026-08-29T15:33:06.977Z	[tt] [info] tailwindcss-patcher 绑定 Tailwind CSS -> node_modules/.pnpm/@tailwindcss+postcss@4.1.18/node_modules/@tailwindcss/postcss (v4.1.18)
+2026-08-29T15:33:06.977Z	[tt] [success] 当前使用 Tailwind CSS 版本为: 4.1.18
+2026-08-29T15:33:07.006Z	[tt] Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+2026-08-29T15:33:07.006Z	[tt]   npx update-browserslist-db@latest
+2026-08-29T15:33:07.007Z	[tt]   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-08-29T15:33:07.255Z	[tt] [info] 检测到 Tailwind CSS 目标记录与当前解析结果不一致，正在自动重新 patch 并刷新缓存。
+2026-08-29T15:33:08.644Z	[lint] Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+2026-08-29T15:33:08.645Z	[lint]   npx update-browserslist-db@latest
+2026-08-29T15:33:08.645Z	[lint]   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-08-29T15:33:11.288Z	[weapp] vite v4.5.14 building for production...
+2026-08-29T15:33:11.403Z	[weapp] transforming...
+2026-08-29T15:33:11.589Z	[web] vite v4.5.14 building for production...
+2026-08-29T15:33:11.706Z	[web] transforming...
+2026-08-29T15:33:11.915Z	[web] Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+2026-08-29T15:33:11.915Z	[web]   npx update-browserslist-db@latest
+2026-08-29T15:33:11.915Z	[web]   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2026-08-29T15:33:12.409Z	[tt] vite v4.5.14 building for production...
+2026-08-29T15:33:12.539Z	[tt] transforming...
+2026-08-29T15:33:21.071Z	[lint] pnpm lint:build exited with code 0
+2026-08-29T15:33:23.186Z	[tsc] pnpm tsc exited with code 0
+2026-08-29T15:33:24.431Z	[server] pnpm build:server exited with code 0
+2026-08-29T15:33:26.383Z	[weapp] [BABEL] Note: The code generator has deoptimised the styling of /opt/buildhome/repo/node_modules/.pnpm/lucide-react-taro@1.4.1_@tarojs+components@4.1.9_@tarojs+helper@4.1.9_@types+react@18.3.27_po_jklpp2byti4a3q4amhl4tkw5iq/node_modules/lucide-react-taro/dist/esm/index.js as it exceeds the max of 500KB.
+2026-08-29T15:33:26.524Z	[tt] [BABEL] Note: The code generator has deoptimised the styling of /opt/buildhome/repo/node_modules/.pnpm/lucide-react-taro@1.4.1_@tarojs+components@4.1.9_@tarojs+helper@4.1.9_@types+react@18.3.27_po_jklpp2byti4a3q4amhl4tkw5iq/node_modules/lucide-react-taro/dist/esm/index.js as it exceeds the max of 500KB.
+2026-08-29T15:33:31.936Z	[tt] src/components/ui/portal.tsx (6:43) "RootPortal" is not exported by "node_modules/.pnpm/@tarojs+plugin-platform-tt@4.1.9_@tarojs+service@4.1.9_@tarojs+shared@4.1.9/node_modules/@tarojs/plugin-platform-tt/dist/components-react.js", imported by "src/components/ui/portal.tsx".
+2026-08-29T15:33:32.717Z	[weapp] ✓ 198 modules transformed.
+2026-08-29T15:33:32.947Z	[weapp] rendering chunks...
+2026-08-29T15:33:33.152Z	[tt] ✓ 197 modules transformed.
+2026-08-29T15:33:33.461Z	[tt] rendering chunks...
+2026-08-29T15:33:35.377Z	[weapp] computing gzip size...
+2026-08-29T15:33:35.390Z	[weapp] dist/app.wxss                                  0.03 kB
+2026-08-29T15:33:35.391Z	[weapp] dist/pages/index/index.wxml                    0.08 kB
+2026-08-29T15:33:35.391Z	[weapp] dist/pages/topics/index.wxml                   0.08 kB
+2026-08-29T15:33:35.391Z	[weapp] dist/pages/profile/index.wxml                  0.08 kB
+2026-08-29T15:33:35.391Z	[weapp] dist/pages/topic-detail/index.wxml             0.08 kB
+2026-08-29T15:33:35.391Z	[weapp] dist/pages/subtopic-materials/index.wxml       0.08 kB
+2026-08-29T15:33:35.391Z	[weapp] dist/pages/interview-plan/index.wxml           0.08 kB
+2026-08-29T15:33:35.391Z	[weapp] dist/pages/interview-record/index.wxml         0.08 kB
+2026-08-29T15:33:35.391Z	[weapp] dist/pages/authorization/index.wxml            0.08 kB
+2026-08-29T15:33:35.391Z	[weapp] dist/pages/material-library/index.wxml         0.08 kB
+2026-08-29T15:33:35.392Z	[weapp] dist/pages/interview-manage/index.wxml         0.08 kB
+2026-08-29T15:33:35.392Z	[weapp] dist/pages/interview-script/index.wxml         0.08 kB
+2026-08-29T15:33:35.392Z	[weapp] dist/pages/profile/index.json                  0.09 kB │ gzip:  0.11 kB
+2026-08-29T15:33:35.393Z	[weapp] dist/pages/material-library/index.json         0.09 kB │ gzip:  0.11 kB
+2026-08-29T15:33:35.393Z	[weapp] dist/pages/interview-script/index.json         0.09 kB │ gzip:  0.11 kB
+2026-08-29T15:33:35.393Z	[weapp] dist/pages/index/index.json                    0.09 kB │ gzip:  0.11 kB
+2026-08-29T15:33:35.393Z	[weapp] dist/pages/topics/index.json                   0.09 kB │ gzip:  0.11 kB
+2026-08-29T15:33:35.393Z	[weapp] dist/pages/topic-detail/index.json             0.09 kB │ gzip:  0.11 kB
+2026-08-29T15:33:35.393Z	[weapp] dist/pages/interview-plan/index.json           0.09 kB │ gzip:  0.11 kB
+2026-08-29T15:33:35.393Z	[weapp] dist/pages/interview-record/index.json         0.09 kB │ gzip:  0.11 kB
+2026-08-29T15:33:35.393Z	[weapp] dist/pages/authorization/index.json            0.09 kB │ gzip:  0.11 kB
+2026-08-29T15:33:35.393Z	[weapp] dist/pages/subtopic-materials/index.json       0.09 kB │ gzip:  0.12 kB
+2026-08-29T15:33:35.393Z	[weapp] dist/pages/interview-manage/index.json         0.09 kB │ gzip:  0.12 kB
+2026-08-29T15:33:35.393Z	[weapp] dist/comp.json                                 0.11 kB │ gzip:  0.11 kB
+2026-08-29T15:33:35.393Z	[weapp] dist/comp.wxml                                 0.14 kB
+2026-08-29T15:33:35.393Z	[weapp] dist/utils.wxs                                 1.00 kB
+2026-08-29T15:33:35.393Z	[weapp] dist/assets/tabbar/book-open.png               1.10 kB
+2026-08-29T15:33:35.394Z	[weapp] dist/assets/tabbar/book-open-active.png        1.12 kB
+2026-08-29T15:33:35.398Z	[weapp] dist/assets/tabbar/folder-kanban.png           1.17 kB
+2026-08-29T15:33:35.399Z	[weapp] dist/assets/tabbar/folder-kanban-active.png    1.19 kB
+2026-08-29T15:33:35.399Z	[weapp] dist/assets/tabbar/home.png                    1.20 kB
+2026-08-29T15:33:35.399Z	[weapp] dist/assets/tabbar/home-active.png             1.21 kB
+2026-08-29T15:33:35.399Z	[weapp] dist/assets/tabbar/user.png                    1.45 kB
+2026-08-29T15:33:35.400Z	[weapp] dist/assets/tabbar/user-active.png             1.48 kB
+2026-08-29T15:33:35.400Z	[weapp] dist/app.json                                  1.55 kB │ gzip:  0.49 kB
+2026-08-29T15:33:35.400Z	[weapp] dist/base.wxml                                60.19 kB
+2026-08-29T15:33:35.400Z	[weapp] dist/app-origin.wxss                          74.23 kB
+2026-08-29T15:33:35.400Z	[weapp] dist/comp.js                                   0.12 kB │ gzip:  0.11 kB
+2026-08-29T15:33:35.400Z	[weapp] dist/pages/profile/index.js                    2.58 kB │ gzip:  0.95 kB
+2026-08-29T15:33:35.400Z	[weapp] dist/app.js                                    3.04 kB │ gzip:  1.43 kB
+2026-08-29T15:33:35.400Z	[weapp] dist/babelHelpers.js                           6.60 kB │ gzip:  2.35 kB
+2026-08-29T15:33:35.400Z	[weapp] dist/pages/topics/index.js                     9.48 kB │ gzip:  2.86 kB
+2026-08-29T15:33:35.400Z	[weapp] dist/pages/interview-script/index.js          10.31 kB │ gzip:  2.93 kB
+2026-08-29T15:33:35.400Z	[weapp] dist/pages/topic-detail/index.js              10.59 kB │ gzip:  3.01 kB
+2026-08-29T15:33:35.400Z	[weapp] dist/pages/index/index.js                     10.91 kB │ gzip:  2.98 kB
+2026-08-29T15:33:35.400Z	[weapp] dist/pages/interview-manage/index.js          11.66 kB │ gzip:  3.27 kB
+2026-08-29T15:33:35.400Z	[weapp] dist/pages/material-library/index.js          12.91 kB │ gzip:  3.59 kB
+2026-08-29T15:33:35.400Z	[weapp] dist/pages/subtopic-materials/index.js        16.33 kB │ gzip:  3.11 kB
+2026-08-29T15:33:35.401Z	[weapp] dist/pages/authorization/index.js             16.90 kB │ gzip:  5.29 kB
+2026-08-29T15:33:35.401Z	[weapp] dist/common.js                                21.26 kB │ gzip:  6.26 kB
+2026-08-29T15:33:35.401Z	[weapp] dist/pages/interview-plan/index.js            35.37 kB │ gzip:  7.83 kB
+2026-08-29T15:33:35.401Z	[weapp] dist/pages/interview-record/index.js          36.57 kB │ gzip:  8.74 kB
+2026-08-29T15:33:35.402Z	[weapp] dist/vendors.js                               46.90 kB │ gzip: 12.82 kB
+2026-08-29T15:33:35.402Z	[weapp] dist/taro.js                                 224.10 kB │ gzip: 72.55 kB
+2026-08-29T15:33:35.402Z	[weapp] ✓ built in 24.09s
+2026-08-29T15:33:35.638Z	[weapp] pnpm build:weapp exited with code 0
+2026-08-29T15:33:35.994Z	[tt] computing gzip size...
+2026-08-29T15:33:36.016Z	[tt] dist-tt/app.ttss                                  0.03 kB
+2026-08-29T15:33:36.017Z	[tt] dist-tt/pages/profile/index.json                  0.06 kB │ gzip:  0.08 kB
+2026-08-29T15:33:36.018Z	[tt] dist-tt/pages/material-library/index.json         0.06 kB │ gzip:  0.09 kB
+2026-08-29T15:33:36.019Z	[tt] dist-tt/pages/interview-script/index.json         0.06 kB │ gzip:  0.09 kB
+2026-08-29T15:33:36.019Z	[tt] dist-tt/pages/index/index.json                    0.06 kB │ gzip:  0.09 kB
+2026-08-29T15:33:36.020Z	[tt] dist-tt/pages/topics/index.json                   0.06 kB │ gzip:  0.09 kB
+2026-08-29T15:33:36.020Z	[tt] dist-tt/pages/topic-detail/index.json             0.06 kB │ gzip:  0.09 kB
+2026-08-29T15:33:36.020Z	[tt] dist-tt/pages/interview-plan/index.json           0.06 kB │ gzip:  0.09 kB
+2026-08-29T15:33:36.020Z	[tt] dist-tt/pages/interview-record/index.json         0.06 kB │ gzip:  0.09 kB
+2026-08-29T15:33:36.021Z	[tt] dist-tt/pages/authorization/index.json            0.06 kB │ gzip:  0.09 kB
+2026-08-29T15:33:36.022Z	[tt] dist-tt/pages/subtopic-materials/index.json       0.06 kB │ gzip:  0.09 kB
+2026-08-29T15:33:36.022Z	[tt] dist-tt/pages/interview-manage/index.json         0.07 kB │ gzip:  0.10 kB
+2026-08-29T15:33:36.022Z	[tt] dist-tt/pages/index/index.ttml                    0.08 kB
+2026-08-29T15:33:36.022Z	[tt] dist-tt/pages/topics/index.ttml                   0.08 kB
+2026-08-29T15:33:36.022Z	[tt] dist-tt/pages/profile/index.ttml                  0.08 kB
+2026-08-29T15:33:36.023Z	[tt] dist-tt/pages/topic-detail/index.ttml             0.08 kB
+2026-08-29T15:33:36.023Z	[tt] dist-tt/pages/subtopic-materials/index.ttml       0.08 kB
+2026-08-29T15:33:36.023Z	[tt] dist-tt/pages/interview-plan/index.ttml           0.08 kB
+2026-08-29T15:33:36.023Z	[tt] dist-tt/pages/interview-record/index.ttml         0.08 kB
+2026-08-29T15:33:36.023Z	[tt] dist-tt/pages/authorization/index.ttml            0.08 kB
+2026-08-29T15:33:36.024Z	[tt] dist-tt/pages/material-library/index.ttml         0.08 kB
+2026-08-29T15:33:36.024Z	[tt] dist-tt/pages/interview-manage/index.ttml         0.08 kB
+2026-08-29T15:33:36.024Z	[tt] dist-tt/pages/interview-script/index.ttml         0.08 kB
+2026-08-29T15:33:36.024Z	[tt] dist-tt/utils.sjs                                 0.39 kB
+2026-08-29T15:33:36.024Z	[tt] dist-tt/assets/tabbar/book-open.png               1.10 kB
+2026-08-29T15:33:36.025Z	[tt] dist-tt/assets/tabbar/book-open-active.png        1.12 kB
+2026-08-29T15:33:36.025Z	[tt] dist-tt/assets/tabbar/folder-kanban.png           1.17 kB
+2026-08-29T15:33:36.025Z	[tt] dist-tt/assets/tabbar/folder-kanban-active.png    1.19 kB
+2026-08-29T15:33:36.025Z	[tt] dist-tt/assets/tabbar/home.png                    1.20 kB
+2026-08-29T15:33:36.025Z	[tt] dist-tt/assets/tabbar/home-active.png             1.21 kB
+2026-08-29T15:33:36.025Z	[tt] dist-tt/assets/tabbar/user.png                    1.45 kB
+2026-08-29T15:33:36.026Z	[tt] dist-tt/assets/tabbar/user-active.png             1.48 kB
+2026-08-29T15:33:36.026Z	[tt] dist-tt/app.json                                  1.55 kB │ gzip:  0.49 kB
+2026-08-29T15:33:36.026Z	[tt] dist-tt/base.ttml                                 8.56 kB
+2026-08-29T15:33:36.026Z	[tt] dist-tt/app-origin.ttss                          74.23 kB
+2026-08-29T15:33:36.026Z	[tt] dist-tt/pages/profile/index.js                    2.58 kB │ gzip:  0.95 kB
+2026-08-29T15:33:36.026Z	[tt] dist-tt/app.js                                    3.04 kB │ gzip:  1.43 kB
+2026-08-29T15:33:36.027Z	[tt] dist-tt/babelHelpers.js                           6.60 kB │ gzip:  2.35 kB
+2026-08-29T15:33:36.027Z	[tt] dist-tt/pages/topics/index.js                     9.48 kB │ gzip:  2.86 kB
+2026-08-29T15:33:36.027Z	[tt] dist-tt/pages/interview-script/index.js          10.31 kB │ gzip:  2.93 kB
+2026-08-29T15:33:36.027Z	[tt] dist-tt/pages/topic-detail/index.js              10.59 kB │ gzip:  3.01 kB
+2026-08-29T15:33:36.028Z	[tt] dist-tt/pages/index/index.js                     10.91 kB │ gzip:  2.98 kB
+2026-08-29T15:33:36.028Z	[tt] dist-tt/pages/interview-manage/index.js          11.66 kB │ gzip:  3.27 kB
+2026-08-29T15:33:36.028Z	[tt] dist-tt/pages/material-library/index.js          12.91 kB │ gzip:  3.59 kB
+2026-08-29T15:33:36.028Z	[tt] dist-tt/pages/subtopic-materials/index.js        16.33 kB │ gzip:  3.11 kB
+2026-08-29T15:33:36.028Z	[tt] dist-tt/pages/authorization/index.js             16.90 kB │ gzip:  5.29 kB
+2026-08-29T15:33:36.029Z	[tt] dist-tt/common.js                                21.27 kB │ gzip:  6.24 kB
+2026-08-29T15:33:36.029Z	[tt] dist-tt/pages/interview-plan/index.js            35.37 kB │ gzip:  7.83 kB
+2026-08-29T15:33:36.029Z	[tt] dist-tt/pages/interview-record/index.js          36.57 kB │ gzip:  8.74 kB
+2026-08-29T15:33:36.029Z	[tt] dist-tt/vendors.js                               46.90 kB │ gzip: 12.82 kB
+2026-08-29T15:33:36.029Z	[tt] dist-tt/taro.js                                 217.16 kB │ gzip: 70.25 kB
+2026-08-29T15:33:36.029Z	[tt] ✓ built in 23.60s
+2026-08-29T15:33:36.135Z	[tt] pnpm build:tt exited with code 0
+2026-08-29T15:33:47.284Z	[web] ✓ 717 modules transformed.
+2026-08-29T15:33:47.523Z	[web] rendering chunks...
+2026-08-29T15:33:47.677Z	[web] computing gzip size...
+2026-08-29T15:33:47.699Z	[web] ../dist-web/static/images/icon-192x192.png            1.06 kB
+2026-08-29T15:33:47.699Z	[web] ../dist-web/static/images/book-open.png               1.10 kB
+2026-08-29T15:33:47.699Z	[web] ../dist-web/static/images/book-open-active.png        1.12 kB
+2026-08-29T15:33:47.699Z	[web] ../dist-web/static/images/folder-kanban.png           1.17 kB
+2026-08-29T15:33:47.699Z	[web] ../dist-web/static/images/folder-kanban-active.png    1.19 kB
+2026-08-29T15:33:47.699Z	[web] ../dist-web/json/manifest.14c69277.json               1.19 kB │ gzip:   0.38 kB
+2026-08-29T15:33:47.699Z	[web] ../dist-web/static/images/home.png                    1.20 kB
+2026-08-29T15:33:47.699Z	[web] ../dist-web/static/images/home-active.png             1.21 kB
+2026-08-29T15:33:47.699Z	[web] ../dist-web/static/images/user.png                    1.45 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/static/images/user-active.png             1.48 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/index.html                                2.31 kB │ gzip:   1.14 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/css/vendors.8886af03.css                  8.38 kB │ gzip:   3.99 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/css/index.bceed418.css                   61.52 kB │ gzip:  10.03 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/js/index.70a56bb0.js                      1.85 kB │ gzip:   0.84 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/js/index.a25264b8.js                      8.30 kB │ gzip:   3.05 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/js/index.612cf71a.js                      8.80 kB │ gzip:   2.88 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/js/index.91df7215.js                      9.45 kB │ gzip:   3.00 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/js/index.509ccaaf.js                      9.48 kB │ gzip:   3.13 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/js/index.79b7ac18.js                      9.90 kB │ gzip:   3.27 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/js/index.37d06be8.js                     11.23 kB │ gzip:   3.63 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/js/index.1ba1845b.js                     12.80 kB │ gzip:   3.02 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/js/index.dedfdc10.js                     14.72 kB │ gzip:   5.27 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/js/common.c7e722d7.js                    20.19 kB │ gzip:   6.35 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/js/app.c793539c.js                       23.65 kB │ gzip:   7.51 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/js/index.f149874c.js                     32.48 kB │ gzip:   8.22 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/js/index.6fe59e18.js                     32.53 kB │ gzip:   9.03 kB
+2026-08-29T15:33:47.700Z	[web] ../dist-web/js/vendors.36529d8b.js                  415.82 kB │ gzip: 132.31 kB
+2026-08-29T15:33:47.703Z	[web] PWA assets copied to /opt/buildhome/repo/dist-web/static
+2026-08-29T15:33:47.704Z	[web] ✓ built in 36.11s
+2026-08-29T15:33:47.830Z	[web] pnpm build:web exited with code 0
+2026-08-29T15:33:47.863Z	Success: Build command completed
+2026-08-29T15:33:48.146Z	Executing user deploy command: npx wrangler deploy
+2026-08-29T15:34:23.291Z	
+2026-08-29T15:34:23.291Z	 ⛅️ wrangler 4.127.1
+2026-08-29T15:34:23.291Z	────────────────────
+2026-08-29T15:34:23.432Z	
+2026-08-29T15:34:23.432Z	Cloudflare collects anonymous telemetry about your usage of Wrangler. Learn more at https://github.com/cloudflare/workers-sdk/tree/main/packages/wrangler/telemetry.md
+2026-08-29T15:34:23.433Z	
+2026-08-29T15:34:23.487Z	✘ [ERROR] The Cloudflare application detection logic has been run in the root of a workspace instead of targeting a specific project. Change your working directory to one of the applications in the workspace and try again.
+2026-08-29T15:34:23.487Z	
+2026-08-29T15:34:23.487Z	
+2026-08-29T15:34:23.498Z	🪵  Logs were written to "/opt/buildhome/.config/.wrangler/logs/wrangler-2026-08-29_15-34-22_741.log"
+2026-08-29T15:34:23.582Z	Failed: error occurred while running deploy command
