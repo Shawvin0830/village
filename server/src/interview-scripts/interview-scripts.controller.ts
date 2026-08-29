@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, HttpCode } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, HttpCode } from '@nestjs/common';
 import { InterviewScriptsService } from './interview-scripts.service';
 
 @Controller('interview-scripts')
@@ -38,5 +38,25 @@ export class InterviewScriptsController {
   async getById(@Param('id') id: string) {
     const data = await this.scriptsService.getById(id);
     return { code: 200, msg: 'success', data };
+  }
+
+  @Put(':id')
+  @HttpCode(200)
+  async update(@Param('id') id: string, @Body() body: {
+    title?: string;
+    selected_questions?: unknown[];
+    warmup_questions?: string[];
+    closing_questions?: string[];
+    status?: string;
+  }) {
+    const data = await this.scriptsService.update(id, body);
+    return { code: 200, msg: 'success', data };
+  }
+
+  @Delete(':id')
+  @HttpCode(200)
+  async delete(@Param('id') id: string) {
+    await this.scriptsService.delete(id);
+    return { code: 200, msg: 'success' };
   }
 }

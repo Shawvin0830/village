@@ -67,4 +67,39 @@ export class InterviewScriptsService {
     if (error) throw new Error(`获取采访稿失败: ${error.message}`);
     return data;
   }
+
+  async update(id: string, body: {
+    title?: string;
+    selected_questions?: unknown[];
+    warmup_questions?: string[];
+    closing_questions?: string[];
+    status?: string;
+  }) {
+    const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (body.title !== undefined) updateData.title = body.title;
+    if (body.selected_questions !== undefined) updateData.selected_questions = body.selected_questions;
+    if (body.warmup_questions !== undefined) updateData.warmup_questions = body.warmup_questions;
+    if (body.closing_questions !== undefined) updateData.closing_questions = body.closing_questions;
+    if (body.status !== undefined) updateData.status = body.status;
+
+    const { data, error } = await this.client
+      .from('interview_scripts')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw new Error(`更新采访稿失败: ${error.message}`);
+    return data;
+  }
+
+  async delete(id: string) {
+    const { error } = await this.client
+      .from('interview_scripts')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw new Error(`删除采访稿失败: ${error.message}`);
+    return true;
+  }
 }
