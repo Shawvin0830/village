@@ -39,7 +39,7 @@ export default function InterviewScriptPage() {
   const topicId = router.params.topicId || ''
 
   const [scripts, setScripts] = useState<InterviewScript[]>([])
-  const [selectedScriptId, setSelectedScriptId] = useState<string | null>(null)
+  const [selectedScript, setSelectedScript] = useState<InterviewScript | null>(null)
   const [loading, setLoading] = useState(true)
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set())
   const [editing, setEditing] = useState(false)
@@ -64,8 +64,8 @@ export default function InterviewScriptPage() {
         const scriptList = res.data.data as InterviewScript[]
         setScripts(scriptList)
         // Auto-select the latest script
-        if (scriptList.length > 0 && !selectedScriptId) {
-          setSelectedScriptId(scriptList[0].id)
+        if (scriptList.length > 0 && !selectedScript) {
+          setSelectedScript(scriptList[0])
         }
       }
     } catch (error) {
@@ -75,7 +75,8 @@ export default function InterviewScriptPage() {
     }
   }
 
-  const currentScript = scripts.find(s => s.id === selectedScriptId) || null
+  // Always show detail view with version switcher if multiple versions
+  const currentScript = selectedScript || (scripts.length > 0 ? scripts[0] : null)
 
   const toggleQuestion = (index: number) => {
     const newExpanded = new Set(expandedQuestions)
@@ -140,8 +141,8 @@ export default function InterviewScriptPage() {
       })
       if (deleteRes.data?.code === 200) {
         Taro.showToast({ title: '删除成功', icon: 'success' })
-        if (selectedScriptId === id) {
-          setSelectedScriptId(null)
+        if (selectedScript?.id === id) {
+          setSelectedScript(null)
         }
         loadScripts()
       }
@@ -166,8 +167,7 @@ export default function InterviewScriptPage() {
   }
 
   const goBack = () => {
-    setSelectedScriptId(null)
-    setExpandedQuestions(new Set())
+    Taro.navigateBack()
   }
 
   if (loading) {
@@ -182,8 +182,8 @@ export default function InterviewScriptPage() {
     )
   }
 
-  // Detail view - show specific questions
-  if (selectedScriptId && currentScript) {
+  // Show detail view - with version switcher at top if multiple versions
+  if (currentScript) {
     return (
       <View className="min-h-screen bg-stone-50 pb-8">
         {/* Header */}
@@ -223,6 +223,27 @@ export default function InterviewScriptPage() {
               <Text className="block text-xs text-stone-400 mt-1">
                 {formatDateTime(currentScript.created_at)}
               </Text>
+              {/* Version switcher */}
+              {scripts.length > 1 && (
+                <View className="flex flex-wrap gap-2 mt-3">
+                  {scripts.map((script, index) => (
+                    <View
+                      key={script.id}
+                      className={`px-3 py-1 rounded-full text-xs cursor-pointer ${
+                        script.id === currentScript.id
+                          ? 'bg-stone-800 text-white'
+                          : 'bg-stone-100 text-stone-600'
+                      }`}
+                      onClick={() => setSelectedScript(script)}
+                    >
+                      {index === 0 ? '最新' : `v${scripts.length - index}`}
+                      <Text className="ml-1 text-xs opacity-70">
+                        {new Date(script.created_at).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
           ) : (
             <View className="mb-4">
@@ -360,7 +381,7 @@ export default function InterviewScriptPage() {
               <Card 
                 key={script.id} 
                 className="border-stone-200 shadow-sm"
-                onClick={() => setSelectedScriptId(script.id)}
+                onClick={() => setSelectedScript(script)}
               >
                 <CardContent className="p-4">
                   <View className="flex items-start justify-between">
