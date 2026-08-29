@@ -1,12 +1,14 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, HttpCode } from '@nestjs/common'
 import { MaterialsService } from './materials.service'
 import { MaterialSearchSkill } from '@/skills/material-search.skill'
+import { VillageResearchSkill } from '@/skills/village-research.skill'
 
 @Controller('materials')
 export class MaterialsController {
   constructor(
     private readonly materialsService: MaterialsService,
     private readonly materialSearchSkill: MaterialSearchSkill,
+    private readonly villageResearchSkill: VillageResearchSkill,
   ) {}
 
   /**
@@ -94,6 +96,45 @@ export class MaterialsController {
       body.topicName?.trim(),
     )
     return { code: 200, msg: 'success', data: result }
+  }
+
+  /**
+   * 专题研究：针对话题进行深度网络研究，生成可读性强的研究文档
+   */
+  @Post('research')
+  @HttpCode(200)
+  async researchTopic(@Body() body: {
+    topicId: string
+    topicName: string
+    topicDescription?: string
+    subtopics?: string[]
+    focusAreas?: string[]
+  }) {
+    if (!body.topicName?.trim()) {
+      return { code: 400, msg: '话题名称不能为空', data: null }
+    }
+    const result = await this.villageResearchSkill.conductResearch({
+      topicName: body.topicName.trim(),
+      topicDescription: body.topicDescription?.trim(),
+      subtopics: body.subtopics,
+      focusAreas: body.focusAreas,
+    })
+
+    // 同时保存到资料库（source 标记为 ai_research）
+    const saved = await this.materialsService.create({
+      topicId: body.topicId,
+      source: 'ai_research',
+      title: result.title,
+      content: result.content,
+      tags: result.dimensions,
+      structuredData: {
+        references: result.references,
+        dimensions: result.dimensions,
+        queries: result.queries,
+      } as Record<string, unknown>,
+    })
+
+    return { code: 200, msg: 'success', data: { ...result, materialId: saved.id } }
   }
 
   /**
