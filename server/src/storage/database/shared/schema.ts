@@ -89,3 +89,26 @@ export const interview_plans = pgTable(
 		index("interview_plans_topic_id_idx").on(table.topic_id),
 	]
 );
+
+// 参考资料表（用户手动输入 + AI联网搜索）
+export const reference_materials = pgTable(
+	"reference_materials",
+	{
+		id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+		topic_id: varchar("topic_id", { length: 36 }).notNull().references(() => topics.id, { onDelete: "cascade" }),
+		subtopic_id: varchar("subtopic_id", { length: 36 }).references(() => subtopics.id, { onDelete: "set null" }),
+		source: varchar("source", { length: 20 }).notNull().default("manual"), // manual | web_search | library
+		title: varchar("title", { length: 255 }).notNull(),
+		content: text("content").notNull(),
+		structured_data: jsonb("structured_data"), // AI 结构化后的数据
+		url: text("url"), // 来源链接（web_search 时记录）
+		tags: jsonb("tags"), // 标签，用于分类
+		created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+		updated_at: timestamp("updated_at", { withTimezone: true }),
+	},
+	(table) => [
+		index("reference_materials_topic_id_idx").on(table.topic_id),
+		index("reference_materials_subtopic_id_idx").on(table.subtopic_id),
+		index("reference_materials_source_idx").on(table.source),
+	]
+);
