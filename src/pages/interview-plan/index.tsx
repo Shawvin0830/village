@@ -59,10 +59,6 @@ interface ResearchReference {
 interface ResearchDocument {
   title: string
   content: string
-  references: ResearchReference[]
-  dimensions: string[]
-  queries: string[]
-  materialId: string | null
 }
 
 const InterviewPlanPage = () => {
@@ -269,6 +265,38 @@ const InterviewPlanPage = () => {
     }
   }
 
+  // 保存研究文档到资料库
+  const [savingResearch, setSavingResearch] = useState(false)
+
+  const handleSaveResearch = async () => {
+    if (!researchDoc || !topicId) return
+    try {
+      setSavingResearch(true)
+      const res = await Network.request({
+        url: '/api/materials',
+        method: 'POST',
+        data: {
+          topicId,
+          source: 'ai_research',
+          title: researchDoc.title,
+          content: researchDoc.content,
+        },
+      })
+      console.log('Save research response:', res.data)
+      if (res.data?.code === 200) {
+        Taro.showToast({ title: '已保存到资料库', icon: 'success' })
+        loadMaterials()
+      } else {
+        Taro.showToast({ title: res.data?.msg || '保存失败', icon: 'none' })
+      }
+    } catch (err) {
+      console.error('保存研究文档失败:', err)
+      Taro.showToast({ title: '保存失败', icon: 'none' })
+    } finally {
+      setSavingResearch(false)
+    }
+  }
+
   const handleResearch = async () => {
     if (!topicId || !topicName) {
       Taro.showToast({ title: '话题信息不完整', icon: 'none' })
@@ -277,9 +305,6 @@ const InterviewPlanPage = () => {
     try {
       setResearching(true)
       setResearchDoc(null)
-
-      // 收集子话题名称
-      const subtopicNames = materials.length > 0 ? [] : []
 
       const focusAreas = researchFocus
         .split(/[,，、\s]+/)
@@ -292,17 +317,13 @@ const InterviewPlanPage = () => {
         data: {
           topicId,
           topicName,
-          subtopics: subtopicNames.length > 0 ? subtopicNames : undefined,
           focusAreas: focusAreas.length > 0 ? focusAreas : undefined,
         },
       })
       console.log('Research response:', res.data)
       const data = res.data?.data
       if (data) {
-        setResearchDoc(data)
-        if (data.materialId) {
-          loadMaterials()
-        }
+        setResearchDoc({ title: data.title, content: data.content })
       }
     } catch (err) {
       console.error('专题研究失败:', err)
@@ -782,49 +803,12 @@ const InterviewPlanPage = () => {
                       </Text>
                     </View>
 
-                    {/* 覆盖维度 */}
-                    {researchDoc.dimensions.length > 0 && (
-                      <View className="flex flex-wrap gap-1">
-                        {researchDoc.dimensions.map((dim, i) => (
-                          <Badge key={i} className="bg-amber-50 text-amber-700 text-xs">
-                            {dim}
-                          </Badge>
-                        ))}
-                      </View>
-                    )}
-
                     {/* 文档正文 */}
                     <View className="p-3 bg-stone-50 rounded-lg">
                       <Text className="block text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">
                         {researchDoc.content}
                       </Text>
                     </View>
-
-                    {/* 参考资料 */}
-                    {researchDoc.references.length > 0 && (
-                      <View>
-                        <Text className="block text-xs font-medium text-stone-600 mb-2">
-                          参考资料（{researchDoc.references.length} 条）
-                        </Text>
-                        <View className="space-y-1">
-                          {researchDoc.references.slice(0, 5).map((ref, i) => (
-                            <View key={i} className="p-2 bg-white rounded border border-stone-100">
-                              <Text className="block text-xs font-medium text-stone-700">
-                                {ref.title}
-                              </Text>
-                              <View className="flex items-center gap-1 mt-1">
-                                <Text className="block text-xs text-stone-400">
-                                  {ref.source}
-                                </Text>
-                                {ref.url && (
-                                  <ExternalLink size={10} color="#9CA3AF" />
-                                )}
-                              </View>
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-                    )}
 
                     {/* 操作按钮 */}
                     <View className="flex gap-2">
@@ -838,11 +822,17 @@ const InterviewPlanPage = () => {
                         <RefreshCw size={12} color="#B45309" className="mr-1" />
                         <Text className="text-xs">重新研究</Text>
                       </Button>
-                      {researchDoc.materialId && (
-                        <Badge className="bg-green-50 text-green-700 text-xs">
-                          已保存到资料库
-                        </Badge>
-                      )}
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-amber-500"
+                        onClick={handleSaveResearch}
+                        disabled={savingResearch}
+                      >
+                        <Save size={12} color="#fff" className="mr-1" />
+                        <Text className="text-xs text-white">
+                          {savingResearch ? '保存中...' : '保存到资料库'}
+                        </Text>
+                      </Button>
                     </View>
                   </View>
                 )}
