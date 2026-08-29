@@ -12,10 +12,6 @@ export const subtopics = pgTable("subtopics", {
 	verifyStatus: varchar("verify_status", { length: 20 }).default('not_started').notNull(),
 	authLevel: varchar("auth_level", { length: 20 }).default('not_set').notNull(),
 	summary: text(),
-	createdBy: varchar("created_by", { length: 36 }),
-	createdByName: varchar("created_by_name", { length: 100 }),
-	updatedBy: varchar("updated_by", { length: 36 }),
-	updatedByName: varchar("updated_by_name", { length: 100 }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
 }, (table) => [
@@ -33,43 +29,6 @@ export const healthCheck = pgTable("health_check", {
 	id: serial().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 });
-
-export const operators = pgTable("operators", {
-	id: varchar({ length: 36 }).default(sql`gen_random_uuid()`).primaryKey().notNull(),
-	projectId: varchar("project_id", { length: 100 }).default('village-memory').notNull(),
-	displayName: varchar("display_name", { length: 100 }).notNull(),
-	role: varchar({ length: 20 }).default('viewer').notNull(),
-	operatorToken: varchar("operator_token", { length: 120 }).notNull(),
-	note: text(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: 'string' }),
-}, (table) => [
-	index("operators_project_id_idx").using("btree", table.projectId.asc().nullsLast().op("text_ops")),
-	index("operators_token_idx").using("btree", table.operatorToken.asc().nullsLast().op("text_ops")),
-	index("operators_role_idx").using("btree", table.role.asc().nullsLast().op("text_ops")),
-]);
-
-export const activityLogs = pgTable("activity_logs", {
-	id: varchar({ length: 36 }).default(sql`gen_random_uuid()`).primaryKey().notNull(),
-	projectId: varchar("project_id", { length: 100 }).default('village-memory').notNull(),
-	operatorId: varchar("operator_id", { length: 36 }),
-	operatorName: varchar("operator_name", { length: 100 }),
-	actionType: varchar("action_type", { length: 60 }).notNull(),
-	targetType: varchar("target_type", { length: 60 }).notNull(),
-	targetId: varchar("target_id", { length: 36 }),
-	targetName: varchar("target_name", { length: 255 }),
-	summary: text().notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("activity_logs_project_id_idx").using("btree", table.projectId.asc().nullsLast().op("text_ops")),
-	index("activity_logs_operator_id_idx").using("btree", table.operatorId.asc().nullsLast().op("text_ops")),
-	index("activity_logs_target_idx").using("btree", table.targetType.asc().nullsLast().op("text_ops"), table.targetId.asc().nullsLast().op("text_ops")),
-	foreignKey({
-			columns: [table.operatorId],
-			foreignColumns: [operators.id],
-			name: "activity_logs_operator_id_operators_id_fk"
-		}).onDelete("set null"),
-]);
 
 export const interviewPlans = pgTable("interview_plans", {
 	id: varchar({ length: 36 }).default(sql`gen_random_uuid()`).primaryKey().notNull(),
@@ -100,10 +59,6 @@ export const interviewRecords = pgTable("interview_records", {
 	endTime: integer("end_time").default(0),
 	status: varchar({ length: 20 }).default('pending').notNull(),
 	aiAnalysis: jsonb("ai_analysis"),
-	createdBy: varchar("created_by", { length: 36 }),
-	createdByName: varchar("created_by_name", { length: 100 }),
-	updatedBy: varchar("updated_by", { length: 36 }),
-	updatedByName: varchar("updated_by_name", { length: 100 }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
 }, (table) => [
@@ -133,10 +88,6 @@ export const interviewees = pgTable("interviewees", {
 	authNote: text("auth_note"),
 	topicAffiliations: jsonb("topic_affiliations").default(sql`'[]'::jsonb`).notNull(),
 	confirmedAt: timestamp("confirmed_at", { withTimezone: true, mode: 'string' }),
-	createdBy: varchar("created_by", { length: 36 }),
-	createdByName: varchar("created_by_name", { length: 100 }),
-	updatedBy: varchar("updated_by", { length: 36 }),
-	updatedByName: varchar("updated_by_name", { length: 100 }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
 }, (table) => [
@@ -185,15 +136,12 @@ export const authorizationRecords = pgTable("authorization_records", {
 	authorizedAt: timestamp("authorized_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	reversible: boolean().default(true).notNull(),
 	previousStatus: varchar("previous_status", { length: 30 }),
-	operatorId: varchar("operator_id", { length: 36 }),
-	operatorName: varchar("operator_name", { length: 100 }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	index("authorization_records_topic_id_idx").using("btree", table.topicId.asc().nullsLast().op("text_ops")),
 	index("authorization_records_interviewee_id_idx").using("btree", table.intervieweeId.asc().nullsLast().op("text_ops")),
 	index("authorization_records_subtopic_id_idx").using("btree", table.subtopicId.asc().nullsLast().op("text_ops")),
 	index("authorization_records_auth_status_idx").using("btree", table.authStatus.asc().nullsLast().op("text_ops")),
-	index("authorization_records_operator_id_idx").using("btree", table.operatorId.asc().nullsLast().op("text_ops")),
 	foreignKey({
 			columns: [table.topicId],
 			foreignColumns: [topics.id],
@@ -209,11 +157,6 @@ export const authorizationRecords = pgTable("authorization_records", {
 			foreignColumns: [subtopics.id],
 			name: "authorization_records_subtopic_id_subtopics_id_fk"
 		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.operatorId],
-			foreignColumns: [operators.id],
-			name: "authorization_records_operator_id_operators_id_fk"
-		}).onDelete("set null"),
 ]);
 
 export const topics = pgTable("topics", {
@@ -221,10 +164,6 @@ export const topics = pgTable("topics", {
 	name: varchar({ length: 255 }).notNull(),
 	description: text(),
 	status: varchar({ length: 20 }).default('active').notNull(),
-	createdBy: varchar("created_by", { length: 36 }),
-	createdByName: varchar("created_by_name", { length: 100 }),
-	updatedBy: varchar("updated_by", { length: 36 }),
-	updatedByName: varchar("updated_by_name", { length: 100 }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
 }, (table) => [
@@ -242,10 +181,6 @@ export const referenceMaterials = pgTable("reference_materials", {
 	structuredData: jsonb("structured_data"),
 	url: text(),
 	tags: jsonb(),
-	createdBy: varchar("created_by", { length: 36 }),
-	createdByName: varchar("created_by_name", { length: 100 }),
-	updatedBy: varchar("updated_by", { length: 36 }),
-	updatedByName: varchar("updated_by_name", { length: 100 }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
 }, (table) => [

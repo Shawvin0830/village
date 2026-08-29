@@ -10,7 +10,6 @@
  */
 import { Injectable } from '@nestjs/common';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
-import type { OperatorContext } from '@/operators/operators.service';
 
 type TopicAffiliation = {
   primary: string;
@@ -58,8 +57,6 @@ type IntervieweeCard = {
   source_count: number;
   source_summary: string;
   confirmed_at: string | null;
-  created_by_name?: string | null;
-  updated_by_name?: string | null;
   is_temporary: boolean;
 };
 
@@ -234,8 +231,6 @@ const mergeIntervieweeCards = (cards: IntervieweeCard[]) => {
     existing.interview_packages = uniqPackages([...existing.interview_packages, ...card.interview_packages]);
     existing.source_count += card.source_count;
     existing.source_summary = existing.source_summary || card.source_summary;
-    existing.created_by_name = existing.created_by_name || card.created_by_name;
-    existing.updated_by_name = existing.updated_by_name || card.updated_by_name;
     existing.is_temporary = existing.is_temporary && card.is_temporary;
   }
 
@@ -299,7 +294,6 @@ export class AuthorizationManagerSkill {
       authNote?: string;
       topicAffiliations?: TopicAffiliation[];
     },
-    operator?: OperatorContext,
   ) {
     if (!Object.keys(AUTH_STATUSES).includes(payload.authStatus)) {
       throw new Error(`无效的授权状态: ${payload.authStatus}`);
@@ -324,10 +318,6 @@ export class AuthorizationManagerSkill {
           auth_note: trimText(payload.authNote) || null,
           topic_affiliations: affiliations,
           confirmed_at: now,
-          created_by: operator?.id || null,
-          created_by_name: operator?.display_name || null,
-          updated_by: operator?.id || null,
-          updated_by_name: operator?.display_name || null,
           created_at: now,
           updated_at: now,
         })
@@ -352,8 +342,6 @@ export class AuthorizationManagerSkill {
         auth_note: trimText(payload.authNote) || null,
         topic_affiliations: affiliations,
         confirmed_at: now,
-        updated_by: operator?.id || null,
-        updated_by_name: operator?.display_name || null,
         updated_at: now,
       };
       if (payload.name !== undefined) updateData.name = trimText(payload.name) || '受访人待补充';
@@ -378,7 +366,6 @@ export class AuthorizationManagerSkill {
       topicAffiliations: affiliations,
       previousStatus,
       now,
-      operator,
     });
 
     const nextInterviewee = await this.getNextUnsetInterviewee(topicId, savedIntervieweeId);
@@ -396,8 +383,6 @@ export class AuthorizationManagerSkill {
       previous_status: previousStatus,
       changed: previousStatus !== payload.authStatus,
       confirmed_at: now,
-      created_by_name: operator?.display_name || null,
-      updated_by_name: operator?.display_name || null,
       next_interviewee_id: nextInterviewee?.id || null,
     };
   }
@@ -408,7 +393,6 @@ export class AuthorizationManagerSkill {
     _authLevel: string,
     authPerson?: string,
     restriction?: string,
-    operator?: OperatorContext,
   ) {
     const name = trimText(authPerson) || '受访人待补充';
     return this.updateIntervieweeAuthorization(topicId, `temp-${subtopicId}-${Date.now()}`, {
@@ -416,7 +400,7 @@ export class AuthorizationManagerSkill {
       authStatus: 'agreed',
       authNote: restriction,
       topicAffiliations: [],
-    }, operator);
+    });
   }
 
   async getAuthOverview(topicId: string) {
@@ -437,8 +421,6 @@ export class AuthorizationManagerSkill {
         auth_note: item.auth_note,
         topic_affiliations: item.topic_affiliations,
         confirmed_at: item.confirmed_at,
-        created_by_name: item.created_by_name || null,
-        updated_by_name: item.updated_by_name || null,
       })),
       agreed_count: interviewees.filter((item) => normalizeAuthStatus(item.auth_status) === 'agreed').length,
       declined_count: interviewees.filter((item) => normalizeAuthStatus(item.auth_status) === 'declined').length,
@@ -450,7 +432,7 @@ export class AuthorizationManagerSkill {
   private async getSavedInterviewees(topicId: string): Promise<IntervieweeCard[]> {
     const { data, error } = await this.client
       .from('interviewees')
-      .select('id, name, age, occupation, role, auth_status, auth_note, topic_affiliations, confirmed_at, created_by_name, updated_by_name')
+      .select('id, name, age, occupation, role, auth_status, auth_note, topic_affiliations, confirmed_at')
       .eq('topic_id', topicId)
       .order('created_at', { ascending: true });
 
@@ -474,8 +456,6 @@ export class AuthorizationManagerSkill {
       source_count: 0,
       source_summary: '',
       confirmed_at: person.confirmed_at || null,
-      created_by_name: person.created_by_name || null,
-      updated_by_name: person.updated_by_name || null,
       is_temporary: false,
     }));
   }
@@ -517,8 +497,6 @@ export class AuthorizationManagerSkill {
         source_count: Math.max(segments.length, 1),
         source_summary: shortText(recordText || segmentText, 120),
         confirmed_at: null,
-        created_by_name: null,
-        updated_by_name: null,
         is_temporary: true,
       };
     });
@@ -562,7 +540,6 @@ export class AuthorizationManagerSkill {
       topicAffiliations: TopicAffiliation[];
       previousStatus: string;
       now: string;
-      operator?: OperatorContext;
     },
   ) {
     const { error } = await this.client.from('authorization_records').insert({
@@ -575,8 +552,6 @@ export class AuthorizationManagerSkill {
       authorized_at: payload.now,
       reversible: true,
       previous_status: payload.previousStatus,
-      operator_id: payload.operator?.id || null,
-      operator_name: payload.operator?.display_name || null,
       created_at: payload.now,
     });
 

@@ -159,17 +159,10 @@ export class TopicsService {
     return { ...topic, subtopics: subtopics || [] };
   }
 
-  async create(name: string, description?: string, operator?: { id: string; display_name: string }) {
+  async create(name: string, description?: string) {
     const { data, error } = await this.client
       .from('topics')
-      .insert({
-        name,
-        description: description || null,
-        created_by: operator?.id || null,
-        created_by_name: operator?.display_name || null,
-        updated_by: operator?.id || null,
-        updated_by_name: operator?.display_name || null,
-      })
+      .insert({ name, description: description || null })
       .select()
       .single();
     if (error) throw new Error(`创建话题失败: ${error.message}`);
@@ -195,18 +188,10 @@ export class TopicsService {
     return data || [];
   }
 
-  async createSubtopic(topicId: string, name: string, icon?: string, operator?: { id: string; display_name: string }) {
+  async createSubtopic(topicId: string, name: string, icon?: string) {
     const { data, error } = await this.client
       .from('subtopics')
-      .insert({
-        topic_id: topicId,
-        name,
-        icon: icon || '📌',
-        created_by: operator?.id || null,
-        created_by_name: operator?.display_name || null,
-        updated_by: operator?.id || null,
-        updated_by_name: operator?.display_name || null,
-      })
+      .insert({ topic_id: topicId, name, icon: icon || '📌' })
       .select()
       .single();
     if (error) throw new Error(`创建子话题失败: ${error.message}`);

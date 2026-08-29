@@ -14,7 +14,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { ASRClient, LLMClient, Config, S3Storage, FetchClient } from 'coze-coding-dev-sdk';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
-import type { OperatorContext } from '@/operators/operators.service';
 import * as fs from 'fs';
 
 // ─── 故事分类枚举 ────────────────────────────────────────
@@ -637,7 +636,7 @@ export class TranscriptOrganizerSkill {
 
   // ─── ASR 转写 + 智能整理 ─────────────────────────────
 
-  async transcribe(topicId: string, audioKey: string, subtopicId?: string, operator?: OperatorContext) {
+  async transcribe(topicId: string, audioKey: string, subtopicId?: string, intervieweeName?: string) {
     const storage = this.getStorage();
     const audioUrl = await storage.generatePresignedUrl({ key: audioKey, expireTime: 3600 });
 
@@ -660,7 +659,7 @@ export class TranscriptOrganizerSkill {
       audioKey,
       text: transcript,
       analysis,
-      operator,
+      intervieweeName,
     });
 
     return this.formatResult(transcript, analysis, record?.id);
@@ -668,14 +667,14 @@ export class TranscriptOrganizerSkill {
 
   // ─── 文本直接整理（跳过 ASR）─────────────────────────
 
-  async transcribeText(topicId: string, text: string, subtopicId?: string, operator?: OperatorContext) {
+  async transcribeText(topicId: string, text: string, subtopicId?: string, intervieweeName?: string) {
     const analysis = await this.organizeTranscript(topicId, text, { hasAudio: false });
 
     const record = await this.saveRecordAndUpdateStoryThreads(topicId, {
       subtopicId,
       text,
       analysis,
-      operator,
+      intervieweeName,
     });
 
     return this.formatResult(text, analysis, record?.id);
@@ -843,7 +842,6 @@ export class TranscriptOrganizerSkill {
     topicId: string,
     subtopicId?: string,
     intervieweeName?: string,
-    operator?: OperatorContext,
   ) {
     if (!file) throw new BadRequestException('未收到文档文件');
 
@@ -902,7 +900,6 @@ export class TranscriptOrganizerSkill {
       text: extractedText,
       analysis,
       intervieweeName,
-      operator,
     });
 
     return {
@@ -941,10 +938,9 @@ export class TranscriptOrganizerSkill {
       text: string;
       analysis: OrganizeResult;
       intervieweeName?: string;
-      operator?: OperatorContext;
     },
   ) {
-    const { subtopicId, audioKey, text, analysis, intervieweeName, operator } = opts;
+    const { subtopicId, audioKey, text, analysis, intervieweeName } = opts;
 
     const { data: record, error } = await this.client
       .from('interview_records')
@@ -959,10 +955,6 @@ export class TranscriptOrganizerSkill {
         confirm_status: 'pending',
         interviewee_name: intervieweeName || null,
         ai_analysis: analysis,
-        created_by: operator?.id || null,
-        created_by_name: operator?.display_name || null,
-        updated_by: operator?.id || null,
-        updated_by_name: operator?.display_name || null,
       })
       .select()
       .single();
@@ -973,11 +965,7 @@ export class TranscriptOrganizerSkill {
     if (subtopicId) {
       await this.client
         .from('subtopics')
-        .update({
-          transcript_status: 'transcribed',
-          updated_by: operator?.id || null,
-          updated_by_name: operator?.display_name || null,
-        })
+        .update({ transcript_status: 'transcribed' })
         .eq('id', subtopicId);
     }
 
@@ -988,11 +976,7 @@ export class TranscriptOrganizerSkill {
     for (const id of [...new Set(matchedIds)]) {
       await this.client
         .from('subtopics')
-        .update({
-          transcript_status: 'transcribed',
-          updated_by: operator?.id || null,
-          updated_by_name: operator?.display_name || null,
-        })
+        .update({ transcript_status: 'transcribed' })
         .eq('id', id);
     }
 

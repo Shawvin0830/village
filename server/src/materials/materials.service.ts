@@ -248,7 +248,6 @@ export class MaterialsService {
     url?: string
     structuredData?: Record<string, unknown>
     tags?: string[]
-    operator?: { id: string; display_name: string }
   }) {
     const { data: material, error } = await this.client
       .from('reference_materials')
@@ -261,10 +260,6 @@ export class MaterialsService {
         url: data.url || null,
         structured_data: data.structuredData || null,
         tags: data.tags || null,
-        created_by: data.operator?.id || null,
-        created_by_name: data.operator?.display_name || null,
-        updated_by: data.operator?.id || null,
-        updated_by_name: data.operator?.display_name || null,
       })
       .select()
       .single()
@@ -293,7 +288,6 @@ export class MaterialsService {
     url?: string
     structuredData?: Record<string, unknown>
     tags?: string[]
-    operator?: { id: string; display_name: string }
   }) {
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
@@ -304,10 +298,6 @@ export class MaterialsService {
     if (data.url !== undefined) updateData.url = data.url
     if (data.structuredData !== undefined) updateData.structured_data = data.structuredData
     if (data.tags !== undefined) updateData.tags = data.tags
-    if (data.operator) {
-      updateData.updated_by = data.operator.id
-      updateData.updated_by_name = data.operator.display_name
-    }
 
     const { data: material, error } = await this.client
       .from('reference_materials')

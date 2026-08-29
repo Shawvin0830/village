@@ -1,9 +1,8 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers, HttpCode } from '@nestjs/common'
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode } from '@nestjs/common'
 import { MaterialsService } from './materials.service'
 import { MaterialSearchSkill } from '@/skills/material-search.skill'
 import { VillageResearchSkill } from '@/skills/village-research.skill'
 import { MaterialEmbeddingSkill } from '@/skills/material-embedding.skill'
-import { OperatorsService, type OperatorHeaders } from '@/operators/operators.service'
 
 @Controller('materials')
 export class MaterialsController {
@@ -12,7 +11,6 @@ export class MaterialsController {
     private readonly materialSearchSkill: MaterialSearchSkill,
     private readonly villageResearchSkill: VillageResearchSkill,
     private readonly materialEmbeddingSkill: MaterialEmbeddingSkill,
-    private readonly operatorsService: OperatorsService,
   ) {}
 
   /**
@@ -101,17 +99,8 @@ export class MaterialsController {
     url?: string
     structuredData?: Record<string, unknown>
     tags?: string[]
-  }, @Headers() headers?: OperatorHeaders) {
-    const operator = await this.operatorsService.require(headers || {})
-    const material = await this.materialsService.create({ ...body, operator })
-    await this.operatorsService.writeLog({
-      operator,
-      actionType: 'create_material',
-      targetType: 'reference_material',
-      targetId: material?.id || null,
-      targetName: body.title,
-      summary: `${operator.display_name} 创建了资料「${body.title}」`,
-    })
+  }) {
+    const material = await this.materialsService.create(body)
     return { code: 200, msg: 'success', data: material }
   }
 
@@ -126,20 +115,11 @@ export class MaterialsController {
     url?: string
     structuredData?: Record<string, unknown>
     tags?: string[]
-  }, @Headers() headers?: OperatorHeaders) {
-    const operator = await this.operatorsService.require(headers || {})
-    const material = await this.materialsService.update(id, { ...body, operator })
+  }) {
+    const material = await this.materialsService.update(id, body)
     if (!material) {
       return { code: 404, msg: '资料不存在', data: null }
     }
-    await this.operatorsService.writeLog({
-      operator,
-      actionType: 'update_material',
-      targetType: 'reference_material',
-      targetId: material?.id || null,
-      targetName: body.title || material.title,
-      summary: `${operator.display_name} 更新了资料「${body.title || material.title}」`,
-    })
     return { code: 200, msg: 'success', data: material }
   }
 

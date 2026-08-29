@@ -6,10 +6,10 @@ import { InterviewPlansModule } from '@/interview-plans/interview-plans.module';
 import { InterviewRecordsModule } from '@/interview-records/interview-records.module';
 import { MaterialsModule } from '@/materials/materials.module';
 import { SkillsModule } from '@/skills/skills.module';
-import { OperatorsModule } from '@/operators/operators.module';
+import { InterviewScriptsModule } from '@/interview-scripts/interview-scripts.module';
 
 @Module({
-  imports: [TopicsModule, InterviewPlansModule, InterviewRecordsModule, MaterialsModule, SkillsModule, OperatorsModule],
+  imports: [TopicsModule, InterviewPlansModule, InterviewRecordsModule, MaterialsModule, SkillsModule, InterviewScriptsModule],
   controllers: [AppController],
   providers: [AppService],
 })

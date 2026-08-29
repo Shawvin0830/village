@@ -1,5 +1,4 @@
 import Taro from '@tarojs/taro'
-import { OPERATOR_TOKEN_KEY, PROJECT_CODE_KEY } from '@/identity'
 
 /**
  * 网络请求模块
@@ -17,37 +16,24 @@ export namespace Network {
         return `${PROJECT_DOMAIN}${url}`
     }
 
-    const withIdentityHeader = (option: any) => {
-        const token = Taro.getStorageSync(OPERATOR_TOKEN_KEY)
-        const projectCode = Taro.getStorageSync(PROJECT_CODE_KEY)
-        return {
-            ...option,
-            header: {
-                ...(option.header || {}),
-                ...(token ? { 'x-operator-token': token } : {}),
-                ...(projectCode ? { 'x-project-code': projectCode } : {}),
-            },
-        }
-    }
-
     export const request: typeof Taro.request = option => {
-        return Taro.request(withIdentityHeader({
+        return Taro.request({
             ...option,
             url: createUrl(option.url),
-        }))
+        })
     }
 
     export const uploadFile: typeof Taro.uploadFile = option => {
-        return Taro.uploadFile(withIdentityHeader({
+        return Taro.uploadFile({
             ...option,
             url: createUrl(option.url),
-        }))
+        })
     }
 
     export const downloadFile: typeof Taro.downloadFile = option => {
-        return Taro.downloadFile(withIdentityHeader({
+        return Taro.downloadFile({
             ...option,
             url: createUrl(option.url),
-        }))
+        })
     }
 }
