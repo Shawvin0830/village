@@ -14,25 +14,25 @@ export class MaterialsController {
   ) {}
 
   /**
-   * 获取所有资料（资料库 TabBar 页面使用）
+   * 获取所有资料（资料库 TabBar 页面使用），支持来源筛选
    */
   @Get()
   @HttpCode(200)
-  async findAll() {
-    const materials = await this.materialsService.findAll()
+  async findAll(@Query('source') source?: string) {
+    const materials = await this.materialsService.findAll(source)
     return { code: 200, msg: 'success', data: materials }
   }
 
   /**
-   * 全局关键词搜索资料（不限话题）
+   * 全局关键词搜索资料（不限话题），支持来源筛选
    */
   @Get('search')
   @HttpCode(200)
-  async globalSearch(@Query('q') query: string) {
+  async globalSearch(@Query('q') query: string, @Query('source') source?: string) {
     if (!query?.trim()) {
       return { code: 200, msg: 'success', data: [] }
     }
-    const materials = await this.materialsService.globalSearch(query.trim())
+    const materials = await this.materialsService.globalSearch(query.trim(), source)
     return { code: 200, msg: 'success', data: materials }
   }
 

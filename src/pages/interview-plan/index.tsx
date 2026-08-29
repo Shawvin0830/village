@@ -488,14 +488,45 @@ const InterviewPlanPage = () => {
     setSelectionConfirmed(false)
   }
 
-  // 确认选择
-  const confirmSelection = () => {
+  // 确认选择并保存采访稿
+  const [savingScript, setSavingScript] = useState(false)
+
+  const confirmSelection = async () => {
     if (selectedQuestions.size === 0) {
       Taro.showToast({ title: '请至少选择一个问题', icon: 'none' })
       return
     }
-    setSelectionConfirmed(true)
-    Taro.showToast({ title: `已选择 ${selectedQuestions.size} 个问题`, icon: 'success' })
+    if (!plan) return
+
+    try {
+      setSavingScript(true)
+      // 获取选中的问题
+      const selectedCoreQuestions = plan.core_questions?.filter((_, i) => selectedQuestions.has(i)) || []
+      
+      const res = await Network.request({
+        url: '/api/interview-scripts',
+        method: 'POST',
+        data: {
+          topic_id: topicId,
+          plan_id: plan.id,
+          title: `${topicName || '采访'} - 采访稿`,
+          selected_questions: selectedCoreQuestions,
+          warmup_questions: plan.warmup_questions || [],
+          closing_questions: plan.closing_questions || [],
+        },
+      })
+      console.log('Save script response:', res.data)
+      
+      if (res.data?.code === 200) {
+        setSelectionConfirmed(true)
+        Taro.showToast({ title: `已保存 ${selectedQuestions.size} 个问题到采访稿`, icon: 'success' })
+      }
+    } catch (err) {
+      console.error('保存采访稿失败:', err)
+      Taro.showToast({ title: '保存失败，请重试', icon: 'none' })
+    } finally {
+      setSavingScript(false)
+    }
   }
 
   const switchVersion = (version: InterviewPlan) => {
@@ -1106,15 +1137,16 @@ const InterviewPlanPage = () => {
                       <Button
                         className="w-full bg-amber-700 hover:bg-amber-800 text-white"
                         onClick={confirmSelection}
+                        disabled={savingScript}
                       >
-                        <Text className="text-sm">确认选择 {selectedQuestions.size} 个问题</Text>
+                        <Text className="text-sm">{savingScript ? '保存中...' : `确认选择 ${selectedQuestions.size} 个问题`}</Text>
                       </Button>
                     </View>
                   )}
                   {selectionConfirmed && (
                     <View className="mt-4 p-3 bg-green-50 rounded-lg flex items-center justify-between">
                       <Text className="block text-sm text-green-700">
-                        已选择 {selectedQuestions.size} 个问题
+                        已保存 {selectedQuestions.size} 个问题到采访稿
                       </Text>
                       <Button
                         variant="outline"

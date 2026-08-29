@@ -204,4 +204,11 @@ export class TopicsController {
     const data = await this.topicsService.getAuthOverview(id);
     return { code: 200, msg: 'success', data };
   }
+
+  @Post(':id/archive')
+  @HttpCode(200)
+  async archiveTopic(@Param('id') id: string) {
+    const data = await this.topicsService.archiveTopic(id);
+    return { code: 200, msg: 'success', data };
+  }
 }

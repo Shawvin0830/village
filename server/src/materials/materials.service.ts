@@ -13,13 +13,24 @@ export class MaterialsService {
   }
 
   /**
-   * 获取所有资料（资料库 TabBar 页面使用）
+   * 获取所有资料（资料库 TabBar 页面使用），支持来源筛选，关联话题名称
    */
-  async findAll() {
-    const { data, error } = await this.client
+  async findAll(source?: string) {
+    let query = this.client
       .from('reference_materials')
-      .select('*')
+      .select('*, topic:topics(id, name)')
       .order('created_at', { ascending: false })
+
+    if (source) {
+      if (source === 'external') {
+        // 外部文献：排除 interview
+        query = query.neq('source', 'interview')
+      } else {
+        query = query.eq('source', source)
+      }
+    }
+
+    const { data, error } = await query
 
     if (error) {
       this.logger.error(`Failed to fetch all materials: ${error.message}`)
@@ -29,15 +40,25 @@ export class MaterialsService {
   }
 
   /**
-   * 全局关键词搜索资料（不限话题）
+   * 全局关键词搜索资料（不限话题），支持来源筛选
    */
-  async globalSearch(query: string) {
-    const { data, error } = await this.client
+  async globalSearch(query: string, source?: string) {
+    let q = this.client
       .from('reference_materials')
-      .select('*')
+      .select('*, topic:topics(id, name)')
       .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
       .order('created_at', { ascending: false })
       .limit(50)
+
+    if (source) {
+      if (source === 'external') {
+        q = q.neq('source', 'interview')
+      } else {
+        q = q.eq('source', source)
+      }
+    }
+
+    const { data, error } = await q
 
     if (error) {
       this.logger.error(`Failed to global search materials: ${error.message}`)

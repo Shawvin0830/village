@@ -91,34 +91,53 @@ export class TopicsService {
       .order('created_at', { ascending: false });
     if (error) throw new Error(`查询话题列表失败: ${error.message}`);
 
-    const topicsWithCount = await Promise.all(
+    const topicsWithDetails = await Promise.all(
       (data || []).map(async (topic) => {
-        const { count } = await this.client
+        // 子话题数量
+        const { count: subtopicCount } = await this.client
           .from('subtopics')
           .select('*', { count: 'exact', head: true })
           .eq('topic_id', topic.id);
 
+        // 是否有采访策划
+        const { data: plans } = await this.client
+          .from('interview_plans')
+          .select('id')
+          .eq('topic_id', topic.id)
+          .limit(1);
+
+        // 已授权的受访人数
+        const { count: authorizedCount } = await this.client
+          .from('interviewees')
+          .select('*', { count: 'exact', head: true })
+          .eq('topic_id', topic.id)
+          .eq('auth_status', 'agreed');
+
+        // 采访记录总数（原始文件）
         const { count: interviewCount } = await this.client
+          .from('interview_records')
+          .select('*', { count: 'exact', head: true })
+          .eq('topic_id', topic.id);
+
+        // 已整理的记录数量
+        const { count: organizedCount } = await this.client
           .from('interview_records')
           .select('*', { count: 'exact', head: true })
           .eq('topic_id', topic.id)
           .eq('status', 'completed');
 
-        const { count: referenceCount } = await this.client
-          .from('reference_materials')
-          .select('*', { count: 'exact', head: true })
-          .eq('topic_id', topic.id);
-
         return {
           ...topic,
-          subtopic_count: count || 0,
+          subtopic_count: subtopicCount || 0,
+          has_interview_plan: plans && plans.length > 0,
+          authorized_count: authorizedCount || 0,
           interview_count: interviewCount || 0,
-          reference_count: referenceCount || 0,
+          organized_count: organizedCount || 0,
         };
       }),
     );
 
-    return topicsWithCount;
+    return topicsWithDetails;
   }
 
   async findOne(id: string) {
@@ -694,5 +713,20 @@ export class TopicsService {
       .eq('subtopic_id', subtopicId);
     if (error) throw new Error(`删除采访记录失败: ${error.message}`);
     return { success: true };
+  }
+
+  /** 归档话题 */
+  async archiveTopic(topicId: string) {
+    const { data, error } = await this.client
+      .from('topics')
+      .update({ 
+        status: 'archived',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', topicId)
+      .select()
+      .single();
+    if (error) throw new Error(`归档话题失败: ${error.message}`);
+    return data;
   }
 }
