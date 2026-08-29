@@ -149,11 +149,14 @@ export const authorizationRecords = pgTable("authorization_records", {
 	reversible: boolean().default(true).notNull(),
 	previousStatus: varchar("previous_status", { length: 30 }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	operatorId: varchar("operator_id", { length: 36 }),
+	operatorName: varchar("operator_name", { length: 100 }),
 }, (table) => [
 	index("authorization_records_topic_id_idx").using("btree", table.topicId.asc().nullsLast().op("text_ops")),
 	index("authorization_records_interviewee_id_idx").using("btree", table.intervieweeId.asc().nullsLast().op("text_ops")),
 	index("authorization_records_subtopic_id_idx").using("btree", table.subtopicId.asc().nullsLast().op("text_ops")),
 	index("authorization_records_auth_status_idx").using("btree", table.authStatus.asc().nullsLast().op("text_ops")),
+	index("authorization_records_operator_id_idx"),
 	foreignKey({
 			columns: [table.topicId],
 			foreignColumns: [topics.id],
@@ -199,6 +202,10 @@ export const referenceMaterials = pgTable("reference_materials", {
 	tags: jsonb(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+	createdBy: varchar("created_by", { length: 36 }),
+	createdByName: varchar("created_by_name", { length: 100 }),
+	updatedBy: varchar("updated_by", { length: 36 }),
+	updatedByName: varchar("updated_by_name", { length: 100 }),
 }, (table) => [
 	index("reference_materials_source_idx").using("btree", table.source.asc().nullsLast().op("text_ops")),
 	index("reference_materials_subtopic_id_idx").using("btree", table.subtopicId.asc().nullsLast().op("text_ops")),
@@ -218,3 +225,27 @@ export const referenceMaterials = pgTable("reference_materials", {
 	pgPolicy("reference_materials_insert_all", { as: "permissive", for: "insert", to: ["public"] }),
 	pgPolicy("reference_materials_select_all", { as: "permissive", for: "select", to: ["public"] }),
 ]);
+
+export const operators = pgTable("operators", {
+	id: varchar({ length: 36 }).default(sql`gen_random_uuid()`).primaryKey().notNull(),
+	projectId: varchar("project_id", { length: 100 }).default("village-memory").notNull(),
+	displayName: varchar("display_name", { length: 100 }).notNull(),
+	role: varchar({ length: 20 }).default("viewer").notNull(),
+	operatorToken: varchar("operator_token", { length: 120 }).notNull(),
+	note: text(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+	lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "string" }),
+});
+
+export const activityLogs = pgTable("activity_logs", {
+	id: varchar({ length: 36 }).default(sql`gen_random_uuid()`).primaryKey().notNull(),
+	projectId: varchar("project_id", { length: 100 }).default("village-memory").notNull(),
+	operatorId: varchar("operator_id", { length: 36 }),
+	operatorName: varchar("operator_name", { length: 100 }),
+	actionType: varchar("action_type", { length: 60 }).notNull(),
+	targetType: varchar("target_type", { length: 60 }).notNull(),
+	targetId: varchar("target_id", { length: 36 }),
+	targetName: varchar("target_name", { length: 255 }),
+	summary: text().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+});

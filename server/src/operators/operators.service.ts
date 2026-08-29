@@ -1,7 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { db } from '@/storage/database/shared/db';
-import { operators, activityLogs } from '@/storage/database/shared/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 export interface OperatorContext {
   id: string;
@@ -50,44 +48,51 @@ export class OperatorsService {
     const normalizedProject = projectId?.trim() || DEFAULT_PROJECT_ID;
     const operatorToken = this.generateToken();
 
-    const [record] = await db
-      .insert(operators)
-      .values({
-        projectId: normalizedProject,
-        displayName: trimmedName,
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from('operators')
+      .insert({
+        project_id: normalizedProject,
+        display_name: trimmedName,
         role: normalizedRole,
-        operatorToken,
+        operator_token: operatorToken,
         note: note || null,
       })
-      .returning();
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
 
     return {
-      id: record.id,
-      displayName: record.displayName,
-      role: record.role,
-      operatorToken: record.operatorToken,
+      id: data.id,
+      displayName: data.display_name,
+      role: data.role,
+      operatorToken: data.operator_token,
     };
   }
 
   async resolve(token: string | undefined): Promise<OperatorContext | null> {
     if (!token?.trim()) return null;
-    const [record] = await db
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from('operators')
       .select()
-      .from(operators)
-      .where(eq(operators.operatorToken, token.trim()))
-      .limit(1);
-    if (!record) return null;
+      .eq('operator_token', token.trim())
+      .limit(1)
+      .maybeSingle();
 
-    await db
-      .update(operators)
-      .set({ lastSeenAt: new Date() })
-      .where(eq(operators.id, record.id));
+    if (error || !data) return null;
+
+    await supabase
+      .from('operators')
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq('id', data.id);
 
     return {
-      id: record.id,
-      displayName: record.displayName,
-      role: record.role,
-      operatorToken: record.operatorToken,
+      id: data.id,
+      displayName: data.display_name,
+      role: data.role,
+      operatorToken: data.operator_token,
     };
   }
 
@@ -120,39 +125,44 @@ export class OperatorsService {
     summary: string;
   }) {
     const { operator, projectId, actionType, targetType, targetId, targetName, summary } = params;
-    await db.insert(activityLogs).values({
-      projectId: projectId || DEFAULT_PROJECT_ID,
-      operatorId: operator?.id || null,
-      operatorName: operator?.displayName || null,
-      actionType,
-      targetType,
-      targetId: targetId || null,
-      targetName: targetName || null,
+    const supabase = getSupabaseClient();
+    await supabase.from('activity_logs').insert({
+      project_id: projectId || DEFAULT_PROJECT_ID,
+      operator_id: operator?.id || null,
+      operator_name: operator?.displayName || null,
+      action_type: actionType,
+      target_type: targetType,
+      target_id: targetId || null,
+      target_name: targetName || null,
       summary,
     });
   }
 
   async getActivityLogs(projectId: string, limit = 50) {
-    return db
+    const supabase = getSupabaseClient();
+    const { data } = await supabase
+      .from('activity_logs')
       .select()
-      .from(activityLogs)
-      .where(eq(activityLogs.projectId, projectId))
-      .orderBy(desc(activityLogs.createdAt))
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
       .limit(limit);
+    return data || [];
   }
 
   async getOperatorById(id: string): Promise<OperatorContext | null> {
-    const [record] = await db
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from('operators')
       .select()
-      .from(operators)
-      .where(eq(operators.id, id))
-      .limit(1);
-    if (!record) return null;
+      .eq('id', id)
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
     return {
-      id: record.id,
-      displayName: record.displayName,
-      role: record.role,
-      operatorToken: record.operatorToken,
+      id: data.id,
+      displayName: data.display_name,
+      role: data.role,
+      operatorToken: data.operator_token,
     };
   }
 }

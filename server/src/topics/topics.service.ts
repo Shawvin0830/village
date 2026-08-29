@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { AuthorizationManagerSkill } from '@/skills/authorization-manager.skill';
+import { OperatorsService, OperatorContext } from '@/operators/operators.service';
 
 type TopicAffiliation = {
   primary: string;
@@ -82,7 +83,10 @@ export class TopicsService {
     return getSupabaseClient();
   }
 
-  constructor(private readonly authSkill: AuthorizationManagerSkill) {}
+  constructor(
+    private readonly authSkill: AuthorizationManagerSkill,
+    private readonly operatorsService: OperatorsService,
+  ) {}
 
   async findAll() {
     const { data, error } = await this.client
@@ -159,10 +163,17 @@ export class TopicsService {
     return { ...topic, subtopics: subtopics || [] };
   }
 
-  async create(name: string, description?: string) {
+  async create(name: string, description?: string, operator?: OperatorContext) {
+    const insertData: Record<string, unknown> = { name, description: description || null };
+    if (operator) {
+      insertData.created_by = operator.id;
+      insertData.created_by_name = operator.displayName;
+      insertData.updated_by = operator.id;
+      insertData.updated_by_name = operator.displayName;
+    }
     const { data, error } = await this.client
       .from('topics')
-      .insert({ name, description: description || null })
+      .insert(insertData)
       .select()
       .single();
     if (error) throw new Error(`创建话题失败: ${error.message}`);
@@ -188,10 +199,17 @@ export class TopicsService {
     return data || [];
   }
 
-  async createSubtopic(topicId: string, name: string, icon?: string) {
+  async createSubtopic(topicId: string, name: string, icon?: string, operator?: OperatorContext) {
+    const insertData: Record<string, unknown> = { topic_id: topicId, name, icon: icon || '📌' };
+    if (operator) {
+      insertData.created_by = operator.id;
+      insertData.created_by_name = operator.displayName;
+      insertData.updated_by = operator.id;
+      insertData.updated_by_name = operator.displayName;
+    }
     const { data, error } = await this.client
       .from('subtopics')
-      .insert({ topic_id: topicId, name, icon: icon || '📌' })
+      .insert(insertData)
       .select()
       .single();
     if (error) throw new Error(`创建子话题失败: ${error.message}`);

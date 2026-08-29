@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode } from '@nestjs/common'
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers, HttpCode } from '@nestjs/common'
 import { MaterialsService } from './materials.service'
 import { MaterialSearchSkill } from '@/skills/material-search.skill'
 import { VillageResearchSkill } from '@/skills/village-research.skill'
 import { MaterialEmbeddingSkill } from '@/skills/material-embedding.skill'
+import { OperatorsService } from '@/operators/operators.service'
 
 @Controller('materials')
 export class MaterialsController {
@@ -11,7 +12,14 @@ export class MaterialsController {
     private readonly materialSearchSkill: MaterialSearchSkill,
     private readonly villageResearchSkill: VillageResearchSkill,
     private readonly materialEmbeddingSkill: MaterialEmbeddingSkill,
+    private readonly operatorsService: OperatorsService,
   ) {}
+
+  private async resolveOperator(headers: any) {
+    const token = headers?.['x-operator-token']
+    if (!token) return undefined
+    try { return await this.operatorsService.resolve(token) ?? undefined } catch { return undefined }
+  }
 
   /**
    * 资料库全局搜索（按话题名、关键词、被采访者）
@@ -99,8 +107,9 @@ export class MaterialsController {
     url?: string
     structuredData?: Record<string, unknown>
     tags?: string[]
-  }) {
-    const material = await this.materialsService.create(body)
+  }, @Headers() headers: any) {
+    const operator = await this.resolveOperator(headers)
+    const material = await this.materialsService.create(body, operator)
     return { code: 200, msg: 'success', data: material }
   }
 
@@ -115,8 +124,9 @@ export class MaterialsController {
     url?: string
     structuredData?: Record<string, unknown>
     tags?: string[]
-  }) {
-    const material = await this.materialsService.update(id, body)
+  }, @Headers() headers: any) {
+    const operator = await this.resolveOperator(headers)
+    const material = await this.materialsService.update(id, body, operator)
     if (!material) {
       return { code: 404, msg: '资料不存在', data: null }
     }
