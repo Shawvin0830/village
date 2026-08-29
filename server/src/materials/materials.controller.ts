@@ -1,10 +1,68 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Headers, HttpCode } from '@nestjs/common'
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers, HttpCode } from '@nestjs/common'
 import { MaterialsService } from './materials.service'
-import type { OperatorHeaders } from '@/operators/operators.service'
+import { MaterialSearchSkill } from '@/skills/material-search.skill'
+import { VillageResearchSkill } from '@/skills/village-research.skill'
+import { MaterialEmbeddingSkill } from '@/skills/material-embedding.skill'
+import { OperatorsService, type OperatorHeaders } from '@/operators/operators.service'
 
 @Controller('materials')
 export class MaterialsController {
-  constructor(private readonly materialsService: MaterialsService) {}
+  constructor(
+    private readonly materialsService: MaterialsService,
+    private readonly materialSearchSkill: MaterialSearchSkill,
+    private readonly villageResearchSkill: VillageResearchSkill,
+    private readonly materialEmbeddingSkill: MaterialEmbeddingSkill,
+    private readonly operatorsService: OperatorsService,
+  ) {}
+
+  /**
+   * 资料库全局搜索（按话题名、关键词、被采访者）
+   */
+  @Get('library-search')
+  @HttpCode(200)
+  async librarySearch(
+    @Query('q') query: string,
+    @Query('source') source?: string,
+  ) {
+    if (!query?.trim()) {
+      return { code: 200, msg: 'success', data: [] }
+    }
+    const results = await this.materialsService.librarySearch(query.trim(), source)
+    return { code: 200, msg: 'success', data: results }
+  }
+
+  /**
+   * 获取有资料的话题列表（资料库首页），支持来源筛选
+   */
+  @Get('topics')
+  @HttpCode(200)
+  async findTopicsWithMaterials(@Query('source') source?: string) {
+    const topics = await this.materialsService.findTopicsWithMaterials(source)
+    return { code: 200, msg: 'success', data: topics }
+  }
+
+  /**
+   * 获取所有资料（资料库 TabBar 页面使用），支持来源筛选
+   */
+  @Get()
+  @HttpCode(200)
+  async findAll(@Query('source') source?: string) {
+    const materials = await this.materialsService.findAll(source)
+    return { code: 200, msg: 'success', data: materials }
+  }
+
+  /**
+   * 全局关键词搜索资料（不限话题），支持来源筛选
+   */
+  @Get('search')
+  @HttpCode(200)
+  async globalSearch(@Query('q') query: string, @Query('source') source?: string) {
+    if (!query?.trim()) {
+      return { code: 200, msg: 'success', data: [] }
+    }
+    const materials = await this.materialsService.globalSearch(query.trim(), source)
+    return { code: 200, msg: 'success', data: materials }
+  }
 
   /**
    * 获取话题下的所有资料
@@ -43,8 +101,17 @@ export class MaterialsController {
     url?: string
     structuredData?: Record<string, unknown>
     tags?: string[]
-  }, @Headers() headers: OperatorHeaders) {
-    const material = await this.materialsService.create(body, headers)
+  }, @Headers() headers?: OperatorHeaders) {
+    const operator = await this.operatorsService.require(headers || {})
+    const material = await this.materialsService.create({ ...body, operator })
+    await this.operatorsService.writeLog({
+      operator,
+      actionType: 'create_material',
+      targetType: 'reference_material',
+      targetId: material?.id || null,
+      targetName: body.title,
+      summary: `${operator.display_name} 创建了资料「${body.title}」`,
+    })
     return { code: 200, msg: 'success', data: material }
   }
 
@@ -59,11 +126,20 @@ export class MaterialsController {
     url?: string
     structuredData?: Record<string, unknown>
     tags?: string[]
-  }, @Headers() headers: OperatorHeaders) {
-    const material = await this.materialsService.update(id, body, headers)
+  }, @Headers() headers?: OperatorHeaders) {
+    const operator = await this.operatorsService.require(headers || {})
+    const material = await this.materialsService.update(id, { ...body, operator })
     if (!material) {
       return { code: 404, msg: '资料不存在', data: null }
     }
+    await this.operatorsService.writeLog({
+      operator,
+      actionType: 'update_material',
+      targetType: 'reference_material',
+      targetId: material?.id || null,
+      targetName: body.title || material.title,
+      summary: `${operator.display_name} 更新了资料「${body.title || material.title}」`,
+    })
     return { code: 200, msg: 'success', data: material }
   }
 
@@ -72,9 +148,72 @@ export class MaterialsController {
    */
   @Delete(':id')
   @HttpCode(200)
-  async delete(@Param('id') id: string, @Headers() headers: OperatorHeaders) {
-    const result = await this.materialsService.delete(id, headers)
+  async delete(@Param('id') id: string) {
+    const result = await this.materialsService.delete(id)
     return { code: 200, msg: 'success', data: result }
+  }
+
+  /**
+   * AI 搜索网络资料并整理成结构化文档
+   */
+  @Post('search')
+  @HttpCode(200)
+  async searchMaterials(@Body() body: { query: string; topicName?: string }) {
+    if (!body.query?.trim()) {
+      return { code: 400, msg: '请输入搜索关键词', data: null }
+    }
+    const result = await this.materialSearchSkill.searchAndStructure(
+      body.query.trim(),
+      body.topicName?.trim(),
+    )
+    return { code: 200, msg: 'success', data: result }
+  }
+
+  /**
+   * 专题研究：针对话题进行深度网络研究，生成可读性强的研究文档
+   */
+  @Post('research')
+  @HttpCode(200)
+  async researchTopic(@Body() body: {
+    topicId: string
+    topicName: string
+    topicDescription?: string
+    subtopics?: string[]
+    focusAreas?: string[]
+  }) {
+    if (!body.topicName?.trim()) {
+      return { code: 400, msg: '话题名称不能为空', data: null }
+    }
+    const result = await this.villageResearchSkill.conductResearch({
+      topicName: body.topicName.trim(),
+      topicDescription: body.topicDescription?.trim(),
+      subtopics: body.subtopics,
+      focusAreas: body.focusAreas,
+    })
+
+    return { code: 200, msg: 'success', data: result }
+  }
+
+  /**
+   * 语义搜索：在话题资料库中进行语义检索
+   */
+  @Get('topic/:topicId/search')
+  @HttpCode(200)
+  async semanticSearch(
+    @Param('topicId') topicId: string,
+    @Query('q') query: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (!query?.trim()) {
+      return { code: 400, msg: '请输入搜索内容', data: [] }
+    }
+    const topK = limit ? parseInt(limit, 10) : 10
+    const results = await this.materialEmbeddingSkill.semanticSearch(
+      topicId,
+      query.trim(),
+      topK,
+    )
+    return { code: 200, msg: 'success', data: results }
   }
 
   /**

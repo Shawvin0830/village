@@ -15,7 +15,7 @@ export class InterviewRecordsService {
     return this.organizerSkill.uploadAudio(file);
   }
 
-  async transcribe(topicId: string, audioKey: string, subtopicId?: string, headers?: OperatorHeaders) {
+  async transcribe(topicId: string, audioKey: string, subtopicId?: string, intervieweeName?: string, headers?: OperatorHeaders) {
     const operator = await this.operatorsService.require(headers || {});
     this.operatorsService.assertCan(operator, 'create_interview_record');
     const result = await this.organizerSkill.transcribe(topicId, audioKey, subtopicId, operator);
@@ -30,7 +30,7 @@ export class InterviewRecordsService {
     return result;
   }
 
-  async transcribeText(topicId: string, text: string, subtopicId?: string, headers?: OperatorHeaders) {
+  async transcribeText(topicId: string, text: string, subtopicId?: string, intervieweeName?: string, headers?: OperatorHeaders) {
     const operator = await this.operatorsService.require(headers || {});
     this.operatorsService.assertCan(operator, 'create_interview_record');
     const result = await this.organizerSkill.transcribeText(topicId, text, subtopicId, operator);
@@ -47,5 +47,52 @@ export class InterviewRecordsService {
 
   async getByTopic(topicId: string) {
     return this.organizerSkill.getByTopic(topicId);
+  }
+
+  async getStoryMap(topicId: string) {
+    return this.organizerSkill.getStoryMap(topicId);
+  }
+
+  async transcribeTextToArchive(
+    topicId: string,
+    text: string,
+    subtopicId?: string,
+    meta?: { title?: string; subtitle?: string; note?: string },
+    headers?: OperatorHeaders,
+  ) {
+    const operator = await this.operatorsService.require(headers || {});
+    this.operatorsService.assertCan(operator, 'create_interview_record');
+    return this.organizerSkill.transcribeTextToArchive(topicId, text, subtopicId, meta);
+  }
+
+  async renderTopicArchive(
+    topicId: string,
+    meta?: { title?: string; subtitle?: string; note?: string },
+  ) {
+    return this.organizerSkill.renderTopicArchive(topicId, meta);
+  }
+
+  async confirmRecord(recordId: string, editedText?: string, subtopicId?: string, headers?: OperatorHeaders) {
+    const operator = await this.operatorsService.require(headers || {});
+    this.operatorsService.assertCan(operator, 'create_interview_record');
+    return this.organizerSkill.confirmRecord(recordId, editedText, subtopicId);
+  }
+
+  async rejectRecord(recordId: string, headers?: OperatorHeaders) {
+    const operator = await this.operatorsService.require(headers || {});
+    this.operatorsService.assertCan(operator, 'create_interview_record');
+    return this.organizerSkill.rejectRecord(recordId);
+  }
+
+  async uploadAndParseDocument(
+    file: Express.Multer.File,
+    topicId: string,
+    subtopicId?: string,
+    intervieweeName?: string,
+    headers?: OperatorHeaders,
+  ) {
+    const operator = await this.operatorsService.require(headers || {});
+    this.operatorsService.assertCan(operator, 'create_interview_record');
+    return this.organizerSkill.uploadAndParseDocument(file, topicId, subtopicId, intervieweeName, operator);
   }
 }
