@@ -16,18 +16,24 @@ interface InterviewScript {
   plan_id: string | null
   title: string | null
   selected_questions: Array<{
-    question: string
+    question?: string
+    child_version?: string
     intent?: string
+    why_ask?: string
     follow_up?: string[]
     dimension?: string
   }>
   warmup_questions: Array<{
-    question: string
+    question?: string
+    child_version?: string
     intent?: string
+    why_ask?: string
   }>
   closing_questions: Array<{
-    question: string
+    question?: string
+    child_version?: string
     intent?: string
+    why_ask?: string
   }>
   status: string
   created_at: string
@@ -44,7 +50,7 @@ export default function InterviewScriptPage() {
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set())
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState('')
-  const [editQuestions, setEditQuestions] = useState<Array<{ question: string; intent?: string; follow_up?: string[] }>>([])
+  const [editQuestions, setEditQuestions] = useState<Array<{ question?: string; child_version?: string; intent?: string; why_ask?: string; follow_up?: string[] }>>([])
 
   useEffect(() => {
     if (topicId) {
@@ -159,7 +165,7 @@ export default function InterviewScriptPage() {
   }
 
   const addQuestion = () => {
-    setEditQuestions([...editQuestions, { question: '', intent: '', follow_up: [] }])
+    setEditQuestions([...editQuestions, { child_version: '', why_ask: '', follow_up: [] }])
   }
 
   const removeQuestion = (index: number) => {
@@ -271,9 +277,9 @@ export default function InterviewScriptPage() {
                         onClick={() => toggleQuestion(idx)}
                       >
                         <Text className="text-sm text-stone-800 flex-1">
-                          {idx + 1}. {q.question}
+                          {idx + 1}. {q.child_version || q.question}
                         </Text>
-                        {(q.intent || (q.follow_up && q.follow_up.length > 0)) && (
+                        {((q.why_ask || q.intent) || (q.follow_up && q.follow_up.length > 0)) && (
                           expandedQuestions.has(idx) ? (
                             <ChevronUp size={16} color="#a8a29e" />
                           ) : (
@@ -283,11 +289,11 @@ export default function InterviewScriptPage() {
                       </View>
                       {expandedQuestions.has(idx) && (
                         <View className="mt-2 pl-6 space-y-2">
-                          {q.intent && (
+                          {(q.why_ask || q.intent) && (
                             <View className="bg-stone-50 rounded-lg p-2">
                               <Text className="block text-xs text-stone-500">
                                 <Text className="text-stone-600 font-medium">意图：</Text>
-                                {q.intent}
+                                {q.why_ask || q.intent}
                               </Text>
                             </View>
                           )}
@@ -325,8 +331,8 @@ export default function InterviewScriptPage() {
                       <View className="flex items-start gap-2 mb-2">
                         <Text className="text-sm text-stone-600 mt-1">{idx + 1}.</Text>
                         <Textarea
-                          value={q.question}
-                          onInput={(e) => updateQuestion(idx, 'question', e.detail.value)}
+                          value={q.child_version || q.question || ''}
+                          onInput={(e) => updateQuestion(idx, 'child_version', e.detail.value)}
                           placeholder="输入问题"
                           className="flex-1 text-sm"
                           style={{ minHeight: '60px' }}
@@ -336,9 +342,9 @@ export default function InterviewScriptPage() {
                         </Button>
                       </View>
                       <Input
-                        value={q.intent || ''}
-                        onInput={(e) => updateQuestion(idx, 'intent', e.detail.value)}
-                        placeholder="意图（可选）"
+                        value={q.why_ask || q.intent || ''}
+                        onInput={(e) => updateQuestion(idx, 'why_ask', e.detail.value)}
+                        placeholder="输入意图（可选）"
                         className="text-xs"
                       />
                     </View>
