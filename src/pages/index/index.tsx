@@ -349,7 +349,7 @@ const IndexPage = () => {
       )}
 
       {/* 快捷操作 */}
-      {selectedTopic && selectedTopic.subtopics.length > 0 && (
+      {selectedTopic && (selectedTopic.subtopics?.length ?? 0) > 0 && (
         <View className="px-4 mt-6">
           <Text className="block text-base font-semibold text-stone-800 mb-3">快捷操作</Text>
           <View className="grid grid-cols-2 gap-3">
