@@ -63,6 +63,7 @@ export class InterviewPlannerSkill {
 
   /**
    * 基于已有策划 + 用户反馈迭代优化
+   * 创建新版本，保留原始草稿
    */
   async refine(planId: string, feedback: string) {
     const { data: existingPlan, error: planError } = await this.client
@@ -76,9 +77,11 @@ export class InterviewPlannerSkill {
     const context = await this.collectContext(existingPlan.topic_id);
     const refined = await this.refinePlan(context, existingPlan, feedback);
 
-    const { data: updatedPlan, error: updateError } = await this.client
+    // 创建新版本，而不是更新原记录
+    const { data: newPlan, error: insertError } = await this.client
       .from('interview_plans')
-      .update({
+      .insert({
+        topic_id: existingPlan.topic_id,
         context_summary: refined.context_summary,
         adult_questions: refined.selected_dimensions,
         child_questions: refined.warmup_questions,
@@ -87,16 +90,16 @@ export class InterviewPlannerSkill {
           closing_questions: refined.closing_questions,
           tips: refined.tips,
         },
-        updated_at: new Date().toISOString(),
+        status: 'draft',
+        parent_id: planId, // 关联到父版本
       })
-      .eq('id', planId)
       .select()
       .single();
 
-    if (updateError) throw new Error(`更新采访策划失败: ${updateError.message}`);
+    if (insertError) throw new Error(`创建新版本失败: ${insertError.message}`);
 
     return {
-      ...updatedPlan,
+      ...newPlan,
       selected_dimensions: refined.selected_dimensions,
       warmup_questions: refined.warmup_questions,
       core_questions: refined.core_questions,
@@ -121,17 +124,38 @@ export class InterviewPlannerSkill {
   }
 
   /**
-   * 获取话题的最新策划
+   * 获取话题的所有策划（按时间倒序，最新版本在前）
    */
   async getByTopic(topicId: string) {
     const { data, error } = await this.client
       .from('interview_plans')
       .select('*')
       .eq('topic_id', topicId)
-      .order('created_at', { ascending: false })
-      .limit(1);
+      .order('created_at', { ascending: false });
     if (error) throw new Error(`查询采访策划失败: ${error.message}`);
-    return data?.[0] || null;
+    return data || [];
+  }
+
+  /**
+   * 获取单个策划的完整版本链（从当前版本追溯到初始草稿）
+   */
+  async getVersionChain(planId: string) {
+    const versions: Record<string, unknown>[] = [];
+    let currentId: string | null = planId;
+
+    while (currentId) {
+      const { data, error } = await this.client
+        .from('interview_plans')
+        .select('*')
+        .eq('id', currentId)
+        .single();
+
+      if (error || !data) break;
+      versions.push(data);
+      currentId = (data as Record<string, unknown>).parent_id as string | null;
+    }
+
+    return versions;
   }
 
   /**

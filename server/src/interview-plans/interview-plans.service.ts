@@ -20,4 +20,8 @@ export class InterviewPlansService {
   async getByTopic(topicId: string) {
     return this.plannerSkill.getByTopic(topicId);
   }
+
+  async getVersionChain(planId: string) {
+    return this.plannerSkill.getVersionChain(planId);
+  }
 }

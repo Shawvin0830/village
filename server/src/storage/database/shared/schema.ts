@@ -37,7 +37,10 @@ export const interviewPlans = pgTable("interview_plans", {
 	adultQuestions: jsonb("adult_questions"),
 	childQuestions: jsonb("child_questions"),
 	tips: jsonb(),
+	status: varchar({ length: 20 }).default('draft').notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+	parentId: varchar("parent_id", { length: 36 }),
 }, (table) => [
 	index("interview_plans_topic_id_idx").using("btree", table.topicId.asc().nullsLast().op("text_ops")),
 	foreignKey({
@@ -45,6 +48,11 @@ export const interviewPlans = pgTable("interview_plans", {
 			foreignColumns: [topics.id],
 			name: "interview_plans_topic_id_topics_id_fk"
 		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.parentId],
+			foreignColumns: [table.id],
+			name: "interview_plans_parent_id_interview_plans_id_fk"
+		}).onDelete("set null"),
 ]);
 
 export const interviewRecords = pgTable("interview_records", {

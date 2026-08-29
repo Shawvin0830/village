@@ -32,4 +32,11 @@ export class InterviewPlansController {
     const data = await this.plansService.getByTopic(topicId);
     return { code: 200, msg: 'success', data };
   }
+
+  @Get('versions/:planId')
+  @HttpCode(200)
+  async getVersionChain(@Param('planId') planId: string) {
+    const data = await this.plansService.getVersionChain(planId);
+    return { code: 200, msg: 'success', data };
+  }
 }

@@ -38,6 +38,7 @@ interface InterviewPlan {
   closing_questions: string[] | null
   tips: TipsData | null
   status?: string
+  created_at?: string
 }
 
 interface Material {
@@ -99,6 +100,10 @@ const InterviewPlanPage = () => {
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
 
+  // 版本历史状态
+  const [planVersions, setPlanVersions] = useState<InterviewPlan[]>([])
+  const [showVersionHistory, setShowVersionHistory] = useState(false)
+
   // 资料库状态
   const [materials, setMaterials] = useState<Material[]>([])
   const [materialsLoading, setMaterialsLoading] = useState(false)
@@ -130,11 +135,12 @@ const InterviewPlanPage = () => {
   const [refining, setRefining] = useState(false)
   const [showDiscussion, setShowDiscussion] = useState(false)
 
-  // 加载话题名称和资料列表
+  // 加载话题名称、资料列表和已有策划
   useEffect(() => {
     if (topicId) {
       loadMaterials()
       loadTopicName()
+      loadPlans()
     }
   }, [topicId])
 
@@ -147,6 +153,31 @@ const InterviewPlanPage = () => {
       }
     } catch (err) {
       console.error('获取话题名称失败:', err)
+    }
+  }
+
+  const loadPlans = async () => {
+    try {
+      const res = await Network.request({ url: `/api/interview-plans/${topicId}` })
+      const data = res.data?.data
+      if (data && Array.isArray(data) && data.length > 0) {
+        const mappedPlans: InterviewPlan[] = data.map((p: Record<string, unknown>) => ({
+          id: p.id as string,
+          context_summary: p.context_summary as string | null,
+          selected_dimensions: p.adult_questions as string[] | null,
+          warmup_questions: p.child_questions as string[] | null,
+          core_questions: (p.tips as Record<string, unknown>)?.core_questions as CoreQuestion[] | null,
+          closing_questions: (p.tips as Record<string, unknown>)?.closing_questions as string[] | null,
+          tips: (p.tips as Record<string, unknown>)?.tips as TipsData | null,
+          status: p.status as string | undefined,
+          created_at: p.created_at as string | undefined,
+        }))
+        setPlanVersions(mappedPlans)
+        // 默认显示最新版本（数组第一个）
+        setPlan(mappedPlans[0])
+      }
+    } catch (err) {
+      console.error('获取采访策划失败:', err)
     }
   }
 
@@ -382,6 +413,8 @@ const InterviewPlanPage = () => {
       const data = res.data?.data
       if (data) {
         setPlan(data)
+        // 将新版本添加到版本历史开头
+        setPlanVersions(prev => [data, ...prev])
         setShowDiscussion(true)
       }
     } catch (err) {
@@ -409,8 +442,10 @@ const InterviewPlanPage = () => {
       const data = res.data?.data
       if (data) {
         setPlan(data)
+        // 将新版本添加到版本历史开头
+        setPlanVersions(prev => [data, ...prev])
         setFeedback('')
-        Taro.showToast({ title: '已根据反馈更新', icon: 'success' })
+        Taro.showToast({ title: '已生成新版本', icon: 'success' })
       }
     } catch (err) {
       console.error('迭代优化失败:', err)
@@ -439,6 +474,11 @@ const InterviewPlanPage = () => {
       console.error('定稿失败:', err)
       Taro.showToast({ title: '定稿失败，请重试', icon: 'none' })
     }
+  }
+
+  const switchVersion = (version: InterviewPlan) => {
+    setPlan(version)
+    setShowVersionHistory(false)
   }
 
   const getSourceLabel = (source: string) => {
@@ -976,6 +1016,57 @@ const InterviewPlanPage = () => {
               <Text className="block text-sm font-medium text-green-800">已定稿</Text>
               <Text className="block text-xs text-green-600 flex-1">此策划已确认为最终版本</Text>
             </View>
+          )}
+
+          {/* 版本历史 */}
+          {planVersions.length > 1 && (
+            <View className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowVersionHistory(!showVersionHistory)}
+                className="flex items-center gap-1"
+              >
+                <FileText size={14} color="#78716c" />
+                <Text>版本历史 ({planVersions.length})</Text>
+                {showVersionHistory ? <ChevronUp size={14} color="#78716c" /> : <ChevronDown size={14} color="#78716c" />}
+              </Button>
+              {plan.status !== 'final' && (
+                <Text className="block text-xs text-stone-400">
+                  当前：第 {planVersions.findIndex(v => v.id === plan.id) + 1} 版
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* 版本历史面板 */}
+          {showVersionHistory && planVersions.length > 1 && (
+            <Card className="border-stone-200 bg-stone-50">
+              <CardContent className="p-3">
+                <Text className="block text-sm font-medium text-stone-700 mb-2">所有版本</Text>
+                <View className="space-y-2">
+                  {planVersions.map((version, index) => (
+                    <View
+                      key={version.id}
+                      className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer ${
+                        version.id === plan.id ? 'bg-amber-100 border border-amber-300' : 'bg-white border border-stone-200'
+                      }`}
+                      onClick={() => switchVersion(version)}
+                    >
+                      <Text className="block text-xs font-medium text-stone-600">
+                        {index === 0 ? '最新' : `第 ${planVersions.length - index} 版`}
+                      </Text>
+                      <Text className="block text-xs text-stone-400 flex-1">
+                        {version.status === 'final' ? '已定稿' : '草稿'}
+                      </Text>
+                      {version.id === plan.id && (
+                        <Text className="block text-xs text-amber-700 font-medium">当前</Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </CardContent>
+            </Card>
           )}
 
           {/* 语境摘要 */}
