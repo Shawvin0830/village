@@ -12,6 +12,20 @@ export class InterviewPlansController {
     return { code: 200, msg: 'success', data };
   }
 
+  @Post(':planId/refine')
+  @HttpCode(200)
+  async refine(@Param('planId') planId: string, @Body() body: { feedback: string }) {
+    const data = await this.plansService.refine(planId, body.feedback);
+    return { code: 200, msg: 'success', data };
+  }
+
+  @Post(':planId/finalize')
+  @HttpCode(200)
+  async finalize(@Param('planId') planId: string) {
+    const data = await this.plansService.finalize(planId);
+    return { code: 200, msg: 'success', data };
+  }
+
   @Get(':topicId')
   @HttpCode(200)
   async getByTopic(@Param('topicId') topicId: string) {

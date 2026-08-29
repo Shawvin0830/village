@@ -233,6 +233,58 @@ ${existingPlanInfo}
   }
 
   /**
+   * 基于已有策划 + 用户反馈迭代优化
+   */
+  async refine(planId: string, feedback: string) {
+    // 1. 获取已有策划
+    const { data: existingPlan, error: planError } = await this.client
+      .from('interview_plans')
+      .select('*')
+      .eq('id', planId)
+      .single();
+
+    if (planError || !existingPlan) throw new Error('策划不存在');
+
+    // 2. 收集话题上下文
+    const context = await this.collectContext(existingPlan.topic_id);
+
+    // 3. 调用 LLM 基于反馈迭代
+    const refined = await this.refinePlan(context, existingPlan, feedback);
+
+    // 4. 更新策划（覆盖式）
+    const { data: updatedPlan, error: updateError } = await this.client
+      .from('interview_plans')
+      .update({
+        context_summary: refined.context_summary,
+        adult_questions: refined.adult_questions,
+        child_questions: refined.child_questions,
+        tips: refined.tips,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', planId)
+      .select()
+      .single();
+
+    if (updateError) throw new Error(`更新采访策划失败: ${updateError.message}`);
+    return updatedPlan;
+  }
+
+  /**
+   * 确认定稿
+   */
+  async finalize(planId: string) {
+    const { data, error } = await this.client
+      .from('interview_plans')
+      .update({ status: 'final', updated_at: new Date().toISOString() })
+      .eq('id', planId)
+      .select()
+      .single();
+
+    if (error) throw new Error(`确认定稿失败: ${error.message}`);
+    return data;
+  }
+
+  /**
    * 获取话题的最新策划
    */
   async getByTopic(topicId: string) {
@@ -244,5 +296,85 @@ ${existingPlanInfo}
       .limit(1);
     if (error) throw new Error(`查询采访策划失败: ${error.message}`);
     return data?.[0] || null;
+  }
+
+  /**
+   * 调用 LLM 基于用户反馈迭代优化策划
+   */
+  private async refinePlan(
+    context: Awaited<ReturnType<InterviewPlannerSkill['collectContext']>>,
+    existingPlan: Record<string, unknown>,
+    feedback: string,
+  ) {
+    const { topic } = context;
+
+    const currentPlanInfo = `
+【语境摘要】${existingPlan.context_summary || '无'}
+【大人版问题】${JSON.stringify(existingPlan.adult_questions || [])}
+【孩子版问题】${JSON.stringify(existingPlan.child_questions || [])}
+【追问锦囊】${JSON.stringify(existingPlan.tips || [])}
+`;
+
+    const systemPrompt = `你叫"村庄记忆"的采访策划师，是一个专业的文化记录顾问。
+
+用户已经有一版采访策划，现在要根据反馈进行修改优化。
+
+## 核心原则
+
+1. **理解反馈意图**：用户可能要求修改某个具体问题、调整方向、增删问题、改变语气等
+2. **保持整体质量**：修改时要保持其他部分的质量，不要因局部修改影响整体
+3. **贴近生活**：问题要贴近老人的日常生活经验，不要太学术化
+4. **双版本设计**：
+   - 大人版（5-8个）：深度追问，包含事实核查角度
+   - 孩子版（3-5个）：简单口语化，8-12岁能理解和执行
+5. **方言友好**：问题设计要考虑方言表达
+6. **追问锦囊要实用**
+
+请严格按以下JSON格式返回，不要有任何其他内容：
+{
+  "context_summary": "更新后的语境摘要",
+  "adult_questions": ["大人备用版问题1", "问题2", ...],
+  "child_questions": ["小孩执行版问题1", "问题2", ...],
+  "tips": ["追问锦囊1", "锦囊2", ...]
+}`;
+
+    const userPrompt = `## 话题信息
+话题名称：${topic.name}
+${topic.description ? `话题描述：${topic.description}` : ''}
+
+## 当前策划
+${currentPlanInfo}
+
+## 用户的修改反馈
+${feedback}
+
+请根据用户反馈修改策划，返回完整的更新后策划（JSON格式）。`;
+
+    const llmClient = this.getLLMClient();
+    const response = await llmClient.invoke(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      { temperature: 0.7 },
+    );
+
+    // 解析 JSON
+    try {
+      const content = response.content.trim();
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+      throw new Error('无法提取 JSON');
+    } catch {
+      // 解析失败时，返回原策划 + 提示
+      return {
+        context_summary: existingPlan.context_summary,
+        adult_questions: existingPlan.adult_questions,
+        child_questions: existingPlan.child_questions,
+        tips: existingPlan.tips,
+      };
+    }
   }
 }

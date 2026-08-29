@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Network } from '@/network'
-import { BookOpen, Lightbulb, RefreshCw, Plus, FileText, Trash2, FolderOpen, Search, Globe, Download, ChevronDown, ChevronUp, FileSearch, BookOpenCheck, Save } from 'lucide-react-taro'
+import { BookOpen, Lightbulb, RefreshCw, Plus, FileText, Trash2, FolderOpen, Search, Globe, Download, ChevronDown, ChevronUp, FileSearch, BookOpenCheck, Save, Send, Pencil, Check, X, MessageCircle, ShieldCheck } from 'lucide-react-taro'
 
 interface InterviewPlan {
   id: string
@@ -16,6 +16,7 @@ interface InterviewPlan {
   adult_questions: string[] | null
   child_questions: string[] | null
   tips: string[] | null
+  status?: string
 }
 
 interface Material {
@@ -87,6 +88,16 @@ const InterviewPlanPage = () => {
   const [researching, setResearching] = useState(false)
   const [researchDoc, setResearchDoc] = useState<ResearchDocument | null>(null)
   const [researchFocus, setResearchFocus] = useState('')
+
+  // 讨论调整状态
+  const [feedback, setFeedback] = useState('')
+  const [refining, setRefining] = useState(false)
+  const [showDiscussion, setShowDiscussion] = useState(false)
+
+  // 问题编辑状态
+  const [editingType, setEditingType] = useState<'adult' | 'child' | 'tip' | null>(null)
+  const [editingIndex, setEditingIndex] = useState<number>(-1)
+  const [editText, setEditText] = useState('')
 
   // 加载话题名称和资料列表
   useEffect(() => {
@@ -340,6 +351,7 @@ const InterviewPlanPage = () => {
       const data = res.data?.data
       if (data) {
         setPlan(data)
+        setShowDiscussion(true)
       }
     } catch (err) {
       console.error('生成采访策划失败:', err)
@@ -348,6 +360,83 @@ const InterviewPlanPage = () => {
       setGenerating(false)
       setLoading(false)
     }
+  }
+
+  const handleRefine = async () => {
+    if (!feedback.trim() || !plan?.id) {
+      Taro.showToast({ title: '请输入你的修改意见', icon: 'none' })
+      return
+    }
+    try {
+      setRefining(true)
+      const res = await Network.request({
+        url: `/api/interview-plans/${plan.id}/refine`,
+        method: 'POST',
+        data: { feedback: feedback.trim() },
+      })
+      console.log('Refine plan response:', res.data)
+      const data = res.data?.data
+      if (data) {
+        setPlan(data)
+        setFeedback('')
+        Taro.showToast({ title: '已根据反馈更新', icon: 'success' })
+      }
+    } catch (err) {
+      console.error('迭代优化失败:', err)
+      Taro.showToast({ title: '更新失败，请重试', icon: 'none' })
+    } finally {
+      setRefining(false)
+    }
+  }
+
+  const handleFinalize = async () => {
+    if (!plan?.id) return
+    const modal = await Taro.showModal({ title: '确认定稿', content: '定稿后将作为最终采访问题清单，确定吗？' })
+    if (!modal.confirm) return
+    try {
+      const res = await Network.request({
+        url: `/api/interview-plans/${plan.id}/finalize`,
+        method: 'POST',
+      })
+      console.log('Finalize plan response:', res.data)
+      const data = res.data?.data
+      if (data) {
+        setPlan(data)
+        Taro.showToast({ title: '已定稿', icon: 'success' })
+      }
+    } catch (err) {
+      console.error('定稿失败:', err)
+      Taro.showToast({ title: '定稿失败，请重试', icon: 'none' })
+    }
+  }
+
+  const handleStartEdit = (type: 'adult' | 'child' | 'tip', index: number, text: string) => {
+    setEditingType(type)
+    setEditingIndex(index)
+    setEditText(text)
+  }
+
+  const handleSaveEdit = () => {
+    if (!plan || editingType === null || editingIndex < 0) return
+    const updated = { ...plan }
+    const key = editingType === 'adult' ? 'adult_questions' : editingType === 'child' ? 'child_questions' : 'tips'
+    const arr = [...(updated[key] || [])]
+    arr[editingIndex] = editText.trim() || arr[editingIndex]
+    updated[key] = arr
+    setPlan(updated)
+    setEditingType(null)
+    setEditingIndex(-1)
+    setEditText('')
+  }
+
+  const handleDeleteQuestion = (type: 'adult' | 'child' | 'tip', index: number) => {
+    if (!plan) return
+    const updated = { ...plan }
+    const key = type === 'adult' ? 'adult_questions' : type === 'child' ? 'child_questions' : 'tips'
+    const arr = [...(updated[key] || [])]
+    arr.splice(index, 1)
+    updated[key] = arr
+    setPlan(updated)
   }
 
   const getSourceLabel = (source: string) => {
@@ -876,6 +965,15 @@ const InterviewPlanPage = () => {
       {/* 策划结果 */}
       {plan && (
         <View className="px-4 space-y-4">
+          {/* 定稿标识 */}
+          {plan.status === 'final' && (
+            <View className="flex items-center gap-2 p-3 bg-green-50 rounded-xl">
+              <ShieldCheck size={18} color="#166534" />
+              <Text className="block text-sm font-medium text-green-800">已定稿</Text>
+              <Text className="block text-xs text-green-600 flex-1">此策划已确认为最终版本</Text>
+            </View>
+          )}
+
           {/* 语境摘要 */}
           {plan.context_summary && (
             <Card className="border-stone-100 bg-white">
@@ -906,7 +1004,41 @@ const InterviewPlanPage = () => {
                       <Text className="block text-sm font-medium text-amber-700 mt-1 flex-shrink-0">
                         {i + 1}.
                       </Text>
-                      <Text className="block text-sm text-stone-700">{q}</Text>
+                      {editingType === 'adult' && editingIndex === i ? (
+                        <View className="flex-1 space-y-2">
+                          <View className="bg-stone-50 rounded-lg p-2">
+                            <Textarea
+                              style={{ width: '100%', minHeight: '60px', backgroundColor: 'transparent' }}
+                              value={editText}
+                              onInput={(e) => setEditText(e.detail.value)}
+                            />
+                          </View>
+                          <View className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => setEditingType(null)}>
+                              <X size={12} color="#78716C" className="mr-1" />
+                              <Text className="text-xs">取消</Text>
+                            </Button>
+                            <Button size="sm" className="bg-amber-700 text-white" onClick={handleSaveEdit}>
+                              <Check size={12} color="#fff" className="mr-1" />
+                              <Text className="text-xs">保存</Text>
+                            </Button>
+                          </View>
+                        </View>
+                      ) : (
+                        <View className="flex-1 flex items-start justify-between gap-2">
+                          <Text className="block text-sm text-stone-700 flex-1">{q}</Text>
+                          {plan.status !== 'final' && (
+                            <View className="flex items-center gap-1 flex-shrink-0">
+                              <Button variant="ghost" size="sm" onClick={() => handleStartEdit('adult', i, q)}>
+                                <Pencil size={12} color="#B45309" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDeleteQuestion('adult', i)}>
+                                <Trash2 size={12} color="#9CA3AF" />
+                              </Button>
+                            </View>
+                          )}
+                        </View>
+                      )}
                     </View>
                   ))}
                 </View>
@@ -930,7 +1062,41 @@ const InterviewPlanPage = () => {
                       <Text className="block text-sm font-medium text-lime-800 mt-1 flex-shrink-0">
                         {i + 1}.
                       </Text>
-                      <Text className="block text-sm text-stone-700">{q}</Text>
+                      {editingType === 'child' && editingIndex === i ? (
+                        <View className="flex-1 space-y-2">
+                          <View className="bg-white rounded-lg p-2">
+                            <Textarea
+                              style={{ width: '100%', minHeight: '60px', backgroundColor: 'transparent' }}
+                              value={editText}
+                              onInput={(e) => setEditText(e.detail.value)}
+                            />
+                          </View>
+                          <View className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => setEditingType(null)}>
+                              <X size={12} color="#78716C" className="mr-1" />
+                              <Text className="text-xs">取消</Text>
+                            </Button>
+                            <Button size="sm" className="bg-lime-800 text-white" onClick={handleSaveEdit}>
+                              <Check size={12} color="#fff" className="mr-1" />
+                              <Text className="text-xs">保存</Text>
+                            </Button>
+                          </View>
+                        </View>
+                      ) : (
+                        <View className="flex-1 flex items-start justify-between gap-2">
+                          <Text className="block text-sm text-stone-700 flex-1">{q}</Text>
+                          {plan.status !== 'final' && (
+                            <View className="flex items-center gap-1 flex-shrink-0">
+                              <Button variant="ghost" size="sm" onClick={() => handleStartEdit('child', i, q)}>
+                                <Pencil size={12} color="#4D7C0F" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDeleteQuestion('child', i)}>
+                                <Trash2 size={12} color="#9CA3AF" />
+                              </Button>
+                            </View>
+                          )}
+                        </View>
+                      )}
                     </View>
                   ))}
                 </View>
@@ -952,7 +1118,41 @@ const InterviewPlanPage = () => {
                   {plan.tips.map((tip, i) => (
                     <View key={i} className="flex items-start gap-2">
                       <Text className="text-sm">💡</Text>
-                      <Text className="block text-sm text-stone-700">{tip}</Text>
+                      {editingType === 'tip' && editingIndex === i ? (
+                        <View className="flex-1 space-y-2">
+                          <View className="bg-white rounded-lg p-2">
+                            <Textarea
+                              style={{ width: '100%', minHeight: '60px', backgroundColor: 'transparent' }}
+                              value={editText}
+                              onInput={(e) => setEditText(e.detail.value)}
+                            />
+                          </View>
+                          <View className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => setEditingType(null)}>
+                              <X size={12} color="#78716C" className="mr-1" />
+                              <Text className="text-xs">取消</Text>
+                            </Button>
+                            <Button size="sm" className="bg-amber-700 text-white" onClick={handleSaveEdit}>
+                              <Check size={12} color="#fff" className="mr-1" />
+                              <Text className="text-xs">保存</Text>
+                            </Button>
+                          </View>
+                        </View>
+                      ) : (
+                        <View className="flex-1 flex items-start justify-between gap-2">
+                          <Text className="block text-sm text-stone-700 flex-1">{tip}</Text>
+                          {plan.status !== 'final' && (
+                            <View className="flex items-center gap-1 flex-shrink-0">
+                              <Button variant="ghost" size="sm" onClick={() => handleStartEdit('tip', i, tip)}>
+                                <Pencil size={12} color="#B45309" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDeleteQuestion('tip', i)}>
+                                <Trash2 size={12} color="#9CA3AF" />
+                              </Button>
+                            </View>
+                          )}
+                        </View>
+                      )}
                     </View>
                   ))}
                 </View>
@@ -960,18 +1160,76 @@ const InterviewPlanPage = () => {
             </Card>
           )}
 
-          {/* 重新生成 */}
-          <View className="pt-2">
-            <Button
-              variant="outline"
-              className="w-full border-stone-200"
-              onClick={handleGenerate}
-              disabled={generating}
-            >
-              <RefreshCw size={16} color="#B45309" className="mr-2" />
-              <Text>{generating ? '重新生成中...' : '重新生成'}</Text>
-            </Button>
-          </View>
+          {/* 讨论调整区域 */}
+          {plan.status !== 'final' && (
+            <Card className="border-stone-200 bg-white">
+              <CardContent className="p-4">
+                <View className="flex items-center justify-between mb-3">
+                  <View className="flex items-center gap-2">
+                    <MessageCircle size={18} color="#B45309" />
+                    <Text className="block text-base font-semibold text-stone-800">
+                      讨论调整
+                    </Text>
+                  </View>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDiscussion(!showDiscussion)}
+                  >
+                    <Text className="text-xs">{showDiscussion ? '收起' : '展开'}</Text>
+                  </Button>
+                </View>
+
+                {showDiscussion && (
+                  <View className="space-y-3">
+                    <Text className="block text-xs text-stone-500">
+                      告诉 AI 你想怎么改，比如「孩子版问题太学术了」、「再加一个关于XX的问题」
+                    </Text>
+                    <View className="bg-stone-50 rounded-lg p-3">
+                      <Textarea
+                        style={{ width: '100%', minHeight: '80px', backgroundColor: 'transparent' }}
+                        placeholder="输入你的修改意见..."
+                        value={feedback}
+                        onInput={(e) => setFeedback(e.detail.value)}
+                      />
+                    </View>
+                    <View className="flex gap-2">
+                      <Button
+                        className="flex-1 bg-amber-700 hover:bg-amber-800 text-white"
+                        onClick={handleRefine}
+                        disabled={refining || !feedback.trim()}
+                      >
+                        <Send size={14} color="#fff" className="mr-1" />
+                        <Text className="text-xs">{refining ? 'AI 正在调整...' : '发送反馈'}</Text>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="border-stone-200"
+                        onClick={handleGenerate}
+                        disabled={generating}
+                      >
+                        <RefreshCw size={14} color="#B45309" className="mr-1" />
+                        <Text className="text-xs">{generating ? '重新生成中...' : '全部重来'}</Text>
+                      </Button>
+                    </View>
+                  </View>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 确认定稿 */}
+          {plan.status !== 'final' && (
+            <View className="pt-2 pb-4">
+              <Button
+                className="w-full bg-green-800 hover:bg-green-900 text-white"
+                onClick={handleFinalize}
+              >
+                <ShieldCheck size={16} color="#fff" className="mr-2" />
+                <Text>确认定稿</Text>
+              </Button>
+            </View>
+          )}
         </View>
       )}
     </View>

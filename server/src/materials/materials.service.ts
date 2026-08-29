@@ -1,9 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { getSupabaseClient } from '@/storage/database/supabase-client'
+import { MaterialEmbeddingSkill } from '@/skills/material-embedding.skill'
 
 @Injectable()
 export class MaterialsService {
   private readonly logger = new Logger(MaterialsService.name)
+
+  constructor(private readonly embeddingSkill: MaterialEmbeddingSkill) {}
 
   private get client() {
     return getSupabaseClient()
@@ -77,6 +80,12 @@ export class MaterialsService {
     }
 
     this.logger.log(`Created material: ${material.id} for topic: ${data.topicId}`)
+
+    // 异步生成 embedding（不阻塞返回）
+    this.embeddingSkill.embedMaterial(material.id).catch((err) => {
+      this.logger.warn(`Failed to embed new material: ${err}`)
+    })
+
     return material
   }
 
@@ -111,6 +120,14 @@ export class MaterialsService {
       this.logger.error(`Failed to update material: ${error.message}`)
       return null
     }
+
+    // 内容变更时重新生成 embedding
+    if (material && (data.title !== undefined || data.content !== undefined)) {
+      this.embeddingSkill.embedMaterial(material.id).catch((err) => {
+        this.logger.warn(`Failed to re-embed material: ${err}`)
+      })
+    }
+
     return material
   }
 

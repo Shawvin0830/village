@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, HttpCode } from '@nestjs/common'
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode } from '@nestjs/common'
 import { MaterialsService } from './materials.service'
 import { MaterialSearchSkill } from '@/skills/material-search.skill'
 import { VillageResearchSkill } from '@/skills/village-research.skill'
+import { MaterialEmbeddingSkill } from '@/skills/material-embedding.skill'
 
 @Controller('materials')
 export class MaterialsController {
@@ -9,6 +10,7 @@ export class MaterialsController {
     private readonly materialsService: MaterialsService,
     private readonly materialSearchSkill: MaterialSearchSkill,
     private readonly villageResearchSkill: VillageResearchSkill,
+    private readonly materialEmbeddingSkill: MaterialEmbeddingSkill,
   ) {}
 
   /**
@@ -121,6 +123,28 @@ export class MaterialsController {
     })
 
     return { code: 200, msg: 'success', data: result }
+  }
+
+  /**
+   * 语义搜索：在话题资料库中进行语义检索
+   */
+  @Get('topic/:topicId/search')
+  @HttpCode(200)
+  async semanticSearch(
+    @Param('topicId') topicId: string,
+    @Query('q') query: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (!query?.trim()) {
+      return { code: 400, msg: '请输入搜索内容', data: [] }
+    }
+    const topK = limit ? parseInt(limit, 10) : 10
+    const results = await this.materialEmbeddingSkill.semanticSearch(
+      topicId,
+      query.trim(),
+      topK,
+    )
+    return { code: 200, msg: 'success', data: results }
   }
 
   /**

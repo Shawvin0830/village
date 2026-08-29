@@ -41,7 +41,9 @@ export const interviewPlans = pgTable("interview_plans", {
 	adultQuestions: jsonb("adult_questions"),
 	childQuestions: jsonb("child_questions"),
 	tips: jsonb(),
+	status: varchar({ length: 20 }).default('draft').notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
 }, (table) => [
 	index("interview_plans_topic_id_idx").using("btree", table.topicId.asc().nullsLast().op("text_ops")),
 	foreignKey({
