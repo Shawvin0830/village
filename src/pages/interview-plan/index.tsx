@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Network } from '@/network'
-import { BookOpen, Lightbulb, RefreshCw, Plus, FileText, Trash2, FolderOpen, Search, Globe, Download, ChevronDown, ChevronUp, FileSearch, BookOpenCheck, ExternalLink } from 'lucide-react-taro'
+import { BookOpen, Lightbulb, RefreshCw, Plus, FileText, Trash2, FolderOpen, Search, Globe, Download, ChevronDown, ChevronUp, FileSearch, BookOpenCheck, Save } from 'lucide-react-taro'
 
 interface InterviewPlan {
   id: string
@@ -47,13 +47,6 @@ interface SearchMaterial {
 interface SearchResult {
   searchSummary: string
   materials: SearchMaterial[]
-}
-
-interface ResearchReference {
-  title: string
-  source: string
-  url: string
-  snippet: string
 }
 
 interface ResearchDocument {
