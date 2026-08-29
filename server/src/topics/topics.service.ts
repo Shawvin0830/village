@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { AuthorizationManagerSkill } from '@/skills/authorization-manager.skill';
 
 @Injectable()
 export class TopicsService {
   private get client() {
     return getSupabaseClient();
   }
+
+  constructor(private readonly authSkill: AuthorizationManagerSkill) {}
 
   async findAll() {
     const { data, error } = await this.client
@@ -14,7 +17,6 @@ export class TopicsService {
       .order('created_at', { ascending: false });
     if (error) throw new Error(`查询话题列表失败: ${error.message}`);
 
-    // 获取每个话题的子话题数量
     const topicsWithCount = await Promise.all(
       (data || []).map(async (topic) => {
         const { count } = await this.client
@@ -94,26 +96,18 @@ export class TopicsService {
     authMethod?: string,
     authPerson?: string,
   ) {
-    const updateData: Record<string, unknown> = {
-      auth_level: authLevel,
-      auth_time: new Date().toISOString(),
-    };
-    if (authMethod) updateData.auth_method = authMethod;
-    if (authPerson) updateData.auth_person = authPerson;
+    return this.authSkill.updateAuth(topicId, subtopicId, authLevel, authMethod, authPerson);
+  }
 
-    const { data, error } = await this.client
-      .from('subtopics')
-      .update(updateData)
-      .eq('id', subtopicId)
-      .eq('topic_id', topicId)
-      .select()
-      .single();
-    if (error) throw new Error(`更新授权失败: ${error.message}`);
-    return data;
+  async getAuthList(topicId: string) {
+    return this.authSkill.getAuthList(topicId);
+  }
+
+  async getAuthOverview(topicId: string) {
+    return this.authSkill.getAuthOverview(topicId);
   }
 
   async getDashboard() {
-    // 获取最近活跃的话题
     const { data: topics, error } = await this.client
       .from('topics')
       .select('id, name, description, status, created_at')
@@ -128,7 +122,6 @@ export class TopicsService {
 
     const topic = topics[0];
 
-    // 获取子话题
     const { data: subtopics, error: subError } = await this.client
       .from('subtopics')
       .select('id, name, icon, transcript_status, verify_status, auth_level, summary')
@@ -138,7 +131,6 @@ export class TopicsService {
 
     const subs = subtopics || [];
 
-    // 生成下一步建议
     const nextSteps: string[] = [];
     const hasNoSubtopics = subs.length === 0;
     const hasUntranscribed = subs.some((s) => s.transcript_status === 'not_started');

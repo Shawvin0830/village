@@ -76,4 +76,18 @@ export class TopicsController {
     const data = await this.topicsService.deleteSubtopic(id, subId);
     return { code: 200, msg: 'success', data };
   }
+
+  @Get(':id/auth-list')
+  @HttpCode(200)
+  async getAuthList(@Param('id') id: string) {
+    const data = await this.topicsService.getAuthList(id);
+    return { code: 200, msg: 'success', data };
+  }
+
+  @Get(':id/auth-overview')
+  @HttpCode(200)
+  async getAuthOverview(@Param('id') id: string) {
+    const data = await this.topicsService.getAuthOverview(id);
+    return { code: 200, msg: 'success', data };
+  }
 }
