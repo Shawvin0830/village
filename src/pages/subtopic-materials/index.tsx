@@ -66,6 +66,7 @@ interface SubtopicMaterialsData {
     transcript_status?: string | null
     verify_status?: string | null
   }
+  essence_summary?: string | null
   quotes: QuoteItem[]
   references: ReferenceItem[]
 }
@@ -271,7 +272,7 @@ const SubtopicMaterialsPage = () => {
         </View>
 
         {/* 采访精华摘要 */}
-        {data.subtopic.summary && (
+        {(data.essence_summary || data.subtopic.summary) && (
           <View className="px-4 mb-4">
             <Card className="border-amber-100 bg-amber-50">
               <CardContent className="p-4">
@@ -282,7 +283,7 @@ const SubtopicMaterialsPage = () => {
                   </Text>
                 </View>
                 <Text className="block text-sm text-stone-700 leading-relaxed">
-                  {data.subtopic.summary}
+                  {data.essence_summary || data.subtopic.summary}
                 </Text>
               </CardContent>
             </Card>
@@ -464,7 +465,7 @@ const SubtopicMaterialsPage = () => {
       </View>
 
       {/* 精华内容摘要 */}
-      {data.subtopic.summary && (
+      {(data.essence_summary || data.subtopic.summary) && (
         <View className="px-4 mb-5">
           <Card className="border-amber-100 bg-amber-50">
             <CardContent className="p-4">
@@ -475,7 +476,7 @@ const SubtopicMaterialsPage = () => {
                 </Text>
               </View>
               <Text className="block text-sm text-stone-700 leading-relaxed">
-                {data.subtopic.summary}
+                {data.essence_summary || data.subtopic.summary}
               </Text>
             </CardContent>
           </Card>

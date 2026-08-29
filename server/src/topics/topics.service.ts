@@ -254,10 +254,28 @@ export class TopicsService {
       .order('created_at', { ascending: false });
     if (referencesError) throw new Error(`查询外部文献失败: ${referencesError.message}`);
 
+    const essenceSummary = this.buildEssenceSummary(
+      subtopic.name,
+      quotes.map((q) => ({
+        quote: q.quote,
+        interviewee: {
+          name: String(q.interviewee.name),
+          occupation: q.interviewee.occupation ? String(q.interviewee.occupation) : null,
+          role: q.interviewee.role ? String(q.interviewee.role) : null,
+        },
+      })),
+      (references || []).map((item) => ({
+        title: item.title,
+        content: item.content,
+        source: item.source,
+      })),
+    );
+
     return {
       topic_id: topic.id,
       topic_name: topic.name,
       subtopic,
+      essence_summary: essenceSummary,
       quotes,
       references: (references || []).map((item) => ({
         id: item.id,
@@ -270,6 +288,58 @@ export class TopicsService {
         created_at: item.created_at,
       })),
     };
+  }
+
+  /**
+   * 根据子话题名称、采访摘录、外部文献，动态生成 200-300 字的精华摘要。
+   * 格式：为什么研究 → 查了哪些资料/采访了谁 → 获得了什么
+   */
+  private buildEssenceSummary(
+    subtopicName: string,
+    quotes: Array<{
+      quote: string;
+      interviewee: { name: string; occupation?: string | null; role?: string | null };
+    }>,
+    references: Array<{ title: string; content: string; source?: string | null }>,
+  ): string {
+    const parts: string[] = [];
+
+    // 1. 为什么研究
+    parts.push(`「${subtopicName}」是村落文化记忆的重要组成部分，对其进行系统梳理有助于还原历史面貌、传承地方文脉。`);
+
+    // 2. 查了哪些资料、采访了谁
+    const peopleList = [...new Set(quotes.map((q) => q.interviewee.name))].filter(Boolean);
+    const refTitles = references.map((r) => r.title).filter(Boolean);
+
+    const researchBits: string[] = [];
+    if (quotes.length > 0) {
+      const exampleNames = peopleList.slice(0, 3).join('、');
+      const more = peopleList.length > 3 ? `等 ${peopleList.length} 位` : '';
+      researchBits.push(`已采集 ${exampleNames}${more} 的口述记忆`);
+    }
+    if (references.length > 0) {
+      const uniqueTitles = [...new Set(refTitles)];
+      const exampleTitles = uniqueTitles.slice(0, 2).map((t) => `《${t}》`).join('、');
+      const more = uniqueTitles.length > 2 ? `等 ${uniqueTitles.length} 篇` : '';
+      researchBits.push(`查阅了 ${exampleTitles || '相关文献'}${more} 外部资料`);
+    }
+
+    if (researchBits.length > 0) {
+      parts.push(`目前，${researchBits.join('，')}。`);
+    } else {
+      parts.push('目前该子话题的资料采集尚处于初期阶段，尚未录入采访记录或外部文献。');
+    }
+
+    // 3. 获得了什么
+    if (quotes.length > 0) {
+      const topQuote = quotes[0]?.quote || '';
+      const snippet = topQuote.length > 60 ? `${topQuote.slice(0, 60)}…` : topQuote;
+      parts.push(`通过整理，已初步提炼出关键口述片段，如"${snippet}"等，为后续深入研究提供了扎实的一手素材。`);
+    } else if (references.length > 0) {
+      parts.push('通过文献梳理，已初步掌握该子话题的基本脉络与核心信息，为后续深入研究奠定了基础。');
+    }
+
+    return parts.join('');
   }
 
   async deleteSubtopic(topicId: string, subtopicId: string) {
