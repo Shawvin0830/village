@@ -138,14 +138,11 @@ export class InterviewPlannerSkill {
    * 收集话题的完整上下文
    */
   private async collectContext(topicId: string) {
-    console.log('[InterviewPlanner] collectContext called with topicId:', topicId);
-    const { data: topic, error } = await this.client
+    const { data: topic } = await this.client
       .from('topics')
       .select('id, name, description')
       .eq('id', topicId)
       .maybeSingle();
-
-    console.log('[InterviewPlanner] topic query result:', { topic, error });
 
     if (!topic) throw new Error('话题不存在');
 
