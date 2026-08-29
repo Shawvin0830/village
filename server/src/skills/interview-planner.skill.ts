@@ -83,11 +83,19 @@ export class InterviewPlannerSkill {
       .order('created_at', { ascending: false })
       .limit(1);
 
+    // 已有资料（用户录入 + AI搜索）
+    const { data: materials } = await this.client
+      .from('reference_materials')
+      .select('id, source, title, content, tags, url')
+      .eq('topic_id', topicId)
+      .order('created_at', { ascending: false });
+
     return {
       topic,
       subtopics: subtopics || [],
       records: records || [],
       existingPlan: existingPlans?.[0] || null,
+      materials: materials || [],
     };
   }
 
@@ -95,7 +103,7 @@ export class InterviewPlannerSkill {
    * 调用 LLM 生成采访策划
    */
   private async generatePlan(context: Awaited<ReturnType<InterviewPlannerSkill['collectContext']>>) {
-    const { topic, subtopics, records, existingPlan } = context;
+    const { topic, subtopics, records, existingPlan, materials } = context;
 
     const subtopicInfo = subtopics
       .map((s) => {
@@ -115,6 +123,14 @@ export class InterviewPlannerSkill {
     const existingPlanInfo = existingPlan
       ? `已有策划摘要：${existingPlan.context_summary?.substring(0, 200) || '无'}`
       : '暂无已有策划';
+
+    const materialsInfo = materials
+      .map((m, i) => {
+        const sourceLabel = m.source === 'manual' ? '用户录入' : m.source === 'ai_search' ? 'AI搜索' : '互联网';
+        const tags = m.tags ? (Array.isArray(m.tags) ? (m.tags as string[]).join('、') : '') : '';
+        return `${i + 1}. [${sourceLabel}] ${m.title}${tags ? ` (标签: ${tags})` : ''}\n   ${m.content?.substring(0, 200) || ''}${m.content && m.content.length > 200 ? '...' : ''}`;
+      })
+      .join('\n\n');
 
     const systemPrompt = `你叫"村庄记忆"的采访策划师，是一个专业的文化记录顾问。
 
@@ -161,6 +177,9 @@ ${topic.description ? `话题描述：${topic.description}` : ''}
 ## 子话题列表
 ${subtopicInfo || '暂无子话题'}
 
+## 已有资料（用户录入/AI搜索）
+${materialsInfo || '暂无资料'}
+
 ## 已有采访内容
 ${recordInfo ? recordInfo.substring(0, 1500) : '暂无已有采访记录'}
 
@@ -168,7 +187,7 @@ ${recordInfo ? recordInfo.substring(0, 1500) : '暂无已有采访记录'}
 ${existingPlanInfo}
 
 请为这个话题生成一份专业的采访策划。注意：
-1. 如果已有采访记录，请找到还没覆盖的空白点
+1. 如果已有资料，请充分利用这些资料，找到还没覆盖的空白点
 2. 孩子版问题要足够简单，让8-12岁的孩子能直接问出口
 3. 追问锦囊要具体实用，给出场景和对应的应对话术`;
 

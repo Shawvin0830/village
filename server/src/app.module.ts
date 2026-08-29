@@ -4,9 +4,11 @@ import { AppService } from '@/app.service';
 import { TopicsModule } from '@/topics/topics.module';
 import { InterviewPlansModule } from '@/interview-plans/interview-plans.module';
 import { InterviewRecordsModule } from '@/interview-records/interview-records.module';
+import { MaterialsModule } from '@/materials/materials.module';
+import { SkillsModule } from '@/skills/skills.module';
 
 @Module({
-  imports: [TopicsModule, InterviewPlansModule, InterviewRecordsModule],
+  imports: [TopicsModule, InterviewPlansModule, InterviewRecordsModule, MaterialsModule, SkillsModule],
   controllers: [AppController],
   providers: [AppService],
 })
