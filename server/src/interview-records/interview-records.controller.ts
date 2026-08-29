@@ -100,9 +100,9 @@ export class InterviewRecordsController {
   @HttpCode(200)
   async confirmRecord(
     @Param('recordId') recordId: string,
-    @Body() body: { edited_text?: string },
+    @Body() body: { edited_text?: string; subtopic_id?: string },
   ) {
-    const data = await this.recordsService.confirmRecord(recordId, body.edited_text);
+    const data = await this.recordsService.confirmRecord(recordId, body.edited_text, body.subtopic_id);
     return { code: 200, msg: 'success', data };
   }
 

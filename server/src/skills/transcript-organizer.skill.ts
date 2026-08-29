@@ -754,7 +754,7 @@ export class TranscriptOrganizerSkill {
 
   // ─── 确认采访记录（归入资料库）─────────────────────────
 
-  async confirmRecord(recordId: string, editedText?: string) {
+  async confirmRecord(recordId: string, editedText?: string, subtopicId?: string) {
     // 1. 先查出原始记录
     const { data: record, error: fetchErr } = await this.client
       .from('interview_records')
@@ -764,11 +764,17 @@ export class TranscriptOrganizerSkill {
     if (fetchErr) throw new Error(`查询记录失败: ${fetchErr.message}`);
     if (!record) throw new Error('记录不存在');
 
-    // 2. 更新确认状态 + 可选更新编辑后的文本
+    // 确定最终使用的 subtopic_id（优先用确认时传入的，其次用原始记录的）
+    const finalSubtopicId = subtopicId || record.subtopic_id;
+
+    // 2. 更新确认状态 + 可选更新编辑后的文本 + 可选更新子话题
     const updateData: Record<string, unknown> = { confirm_status: 'confirmed' };
     if (editedText && editedText.trim()) {
       updateData.transcript_text = editedText.trim();
       updateData.mandarin_text = editedText.trim();
+    }
+    if (subtopicId) {
+      updateData.subtopic_id = subtopicId;
     }
     const { error: updateErr } = await this.client
       .from('interview_records')
@@ -785,12 +791,12 @@ export class TranscriptOrganizerSkill {
       : `采访记录 ${new Date(record.created_at).toLocaleDateString('zh-CN')}`;
 
     const tags = ['历史采访沉淀'];
-    if (record.subtopic_id) {
+    if (finalSubtopicId) {
       // 尝试获取子话题名称作为标签
       const { data: subtopic } = await this.client
         .from('subtopics')
         .select('name')
-        .eq('id', record.subtopic_id)
+        .eq('id', finalSubtopicId)
         .maybeSingle();
       if (subtopic?.name) tags.push(subtopic.name);
     }
@@ -799,7 +805,7 @@ export class TranscriptOrganizerSkill {
       .from('reference_materials')
       .insert({
         topic_id: record.topic_id,
-        subtopic_id: record.subtopic_id || null,
+        subtopic_id: finalSubtopicId || null,
         source: 'interview',
         title,
         content: finalText,
@@ -810,7 +816,7 @@ export class TranscriptOrganizerSkill {
       .single();
     if (matErr) throw new Error(`保存到资料库失败: ${matErr.message}`);
 
-    return { record: { ...record, confirm_status: 'confirmed' }, material };
+    return { record: { ...record, confirm_status: 'confirmed', subtopic_id: finalSubtopicId }, material };
   }
 
   // ─── 驳回采访记录 ────────────────────────────────────

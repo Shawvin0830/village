@@ -93,6 +93,8 @@ const InterviewRecordPage = () => {
   const [editedTranscript, setEditedTranscript] = useState('')
   const [isEditingTranscript, setIsEditingTranscript] = useState(false)
   const [saving, setSaving] = useState(false)
+  // 确认入库时的子话题（可与录音时不同）
+  const [confirmSubtopicId, setConfirmSubtopicId] = useState('')
   const [docFilePath, setDocFilePath] = useState('')
   const [docFileName, setDocFileName] = useState('')
 
@@ -183,6 +185,7 @@ const InterviewRecordPage = () => {
         setEditedTranscript(data.transcript || '')
         setConfirmStatus('pending')
         setIsEditingTranscript(false)
+        setConfirmSubtopicId(selectedSubId)
         Taro.showToast({ title: '转写完成', icon: 'success' })
       }
     } catch (err) {
@@ -217,6 +220,7 @@ const InterviewRecordPage = () => {
         setEditedTranscript(data.transcript || '')
         setConfirmStatus('pending')
         setIsEditingTranscript(false)
+        setConfirmSubtopicId(selectedSubId)
         Taro.showToast({ title: '整理完成', icon: 'success' })
       }
     } catch (err) {
@@ -253,6 +257,7 @@ const InterviewRecordPage = () => {
         setEditedTranscript(resultData.transcript || '')
         setConfirmStatus('pending')
         setIsEditingTranscript(false)
+        setConfirmSubtopicId(selectedSubId)
         Taro.showToast({ title: '文档解析完成', icon: 'success' })
       }
     } catch (err) {
@@ -298,6 +303,7 @@ const InterviewRecordPage = () => {
         method: 'POST',
         data: {
           edited_text: editedTranscript !== result?.transcript ? editedTranscript : undefined,
+          subtopic_id: confirmSubtopicId || undefined,
         },
       })
       console.log('Confirm response:', res.data)
@@ -687,6 +693,27 @@ const InterviewRecordPage = () => {
           {confirmStatus && (
             <Card className="border-stone-100 bg-white">
               <CardContent className="p-4">
+                {/* 子话题选择 */}
+                {confirmStatus === 'pending' && subtopics.length > 0 && (
+                  <View className="mb-4">
+                    <Text className="block text-sm font-medium text-stone-700 mb-2">
+                      归入子话题
+                    </Text>
+                    <Select value={confirmSubtopicId} onValueChange={setConfirmSubtopicId}>
+                      <SelectTrigger className="bg-white border-stone-200">
+                        <SelectValue placeholder="选择子话题" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {subtopics.map((sub) => (
+                          <SelectItem key={sub.id} value={sub.id}>
+                            <Text>{sub.icon} {sub.name}</Text>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </View>
+                )}
+
                 <View className="flex items-center justify-between">
                   <View className="flex items-center gap-2">
                     {confirmStatus === 'pending' && (
