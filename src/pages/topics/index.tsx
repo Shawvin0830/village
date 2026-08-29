@@ -1,0 +1,219 @@
+import { View, Text } from '@tarojs/components'
+import { useState, useCallback } from 'react'
+import Taro, { useDidShow } from '@tarojs/taro'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Network } from '@/network'
+import { Plus, ChevronRight } from 'lucide-react-taro'
+
+interface Topic {
+  id: string
+  name: string
+  description: string | null
+  status: string
+  subtopic_count: number
+  created_at: string
+}
+
+const TopicsPage = () => {
+  const [topics, setTopics] = useState<Topic[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showCreate, setShowCreate] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newDesc, setNewDesc] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  const fetchTopics = useCallback(async () => {
+    try {
+      setLoading(true)
+      const res = await Network.request({ url: '/api/topics' })
+      console.log('Topics response:', res.data)
+      const data = res.data?.data
+      if (data) {
+        setTopics(data)
+      }
+    } catch (err) {
+      console.error('获取话题列表失败:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useDidShow(() => {
+    fetchTopics()
+  })
+
+  const handleCreate = async () => {
+    if (!newName.trim()) {
+      Taro.showToast({ title: '请输入话题名称', icon: 'none' })
+      return
+    }
+    try {
+      setCreating(true)
+      const res = await Network.request({
+        url: '/api/topics',
+        method: 'POST',
+        data: { name: newName.trim(), description: newDesc.trim() || undefined },
+      })
+      console.log('Create topic response:', res.data)
+      if (res.data?.data) {
+        Taro.showToast({ title: '创建成功', icon: 'success' })
+        setShowCreate(false)
+        setNewName('')
+        setNewDesc('')
+        fetchTopics()
+      }
+    } catch (err) {
+      console.error('创建话题失败:', err)
+      Taro.showToast({ title: '创建失败', icon: 'none' })
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const goToDetail = (topicId: string) => {
+    Taro.navigateTo({ url: `/pages/topic-detail/index?id=${topicId}` })
+  }
+
+  return (
+    <View className="min-h-screen bg-stone-50 pb-20">
+      {/* 头部 */}
+      <View className="px-4 pt-6 pb-4 flex items-center justify-between">
+        <View>
+          <Text className="block text-xl font-bold text-stone-800">话题管理</Text>
+          <Text className="block text-sm text-stone-500">管理你的村庄记忆话题</Text>
+        </View>
+        <Button
+          size="sm"
+          className="bg-amber-700 hover:bg-amber-800 text-white"
+          onClick={() => setShowCreate(true)}
+        >
+          <Plus size={16} color="#B45309" className="mr-1" />
+          <Text>新建</Text>
+        </Button>
+      </View>
+
+      {/* 话题列表 */}
+      <View className="px-4">
+        {loading ? (
+          <View className="space-y-3">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </View>
+        ) : topics.length === 0 ? (
+          <View className="flex flex-col items-center justify-center py-20">
+            <Text className="block text-4xl mb-4">📝</Text>
+            <Text className="block text-base text-stone-500 mb-2 text-center">还没有话题</Text>
+            <Text className="block text-sm text-stone-400 mb-6 text-center">
+              点击上方新建按钮，开始记录村庄记忆
+            </Text>
+            <Button
+              className="bg-amber-700 text-white"
+              onClick={() => setShowCreate(true)}
+            >
+              <Plus size={16} color="#B45309" className="mr-1" />
+              <Text>创建第一个话题</Text>
+            </Button>
+          </View>
+        ) : (
+          <View className="space-y-3">
+            {topics.map((topic) => (
+              <Card
+                key={topic.id}
+                className="border-stone-100 shadow-sm"
+                onClick={() => goToDetail(topic.id)}
+              >
+                <CardContent className="p-4">
+                  <View className="flex items-center justify-between">
+                    <View className="flex-1">
+                      <Text className="block text-base font-semibold text-stone-800 mb-1">
+                        {topic.name}
+                      </Text>
+                      {topic.description && (
+                        <Text className="block text-sm text-stone-500 mb-2 line-clamp-2">
+                          {topic.description}
+                        </Text>
+                      )}
+                      <View className="flex items-center gap-2">
+                        <Badge className="bg-amber-50 text-amber-700 border-amber-200">
+                          <Text className="text-xs">{topic.subtopic_count} 个子话题</Text>
+                        </Badge>
+                        <Text className="block text-xs text-stone-400">
+                          {new Date(topic.created_at).toLocaleDateString('zh-CN')}
+                        </Text>
+                      </View>
+                    </View>
+                    <ChevronRight size={20} color="#A8A29E" />
+                  </View>
+                </CardContent>
+              </Card>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* 创建话题弹窗 */}
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="bg-white">
+          <DialogHeader>
+            <DialogTitle>
+              <Text>新建话题</Text>
+            </DialogTitle>
+            <DialogDescription>
+              <Text>创建一个新的村庄记忆话题</Text>
+            </DialogDescription>
+          </DialogHeader>
+          <View className="space-y-4 mt-4">
+            <View>
+              <Text className="block text-sm font-medium text-stone-700 mb-2">话题名称</Text>
+              <View className="bg-stone-50 rounded-xl px-4 py-3">
+                <Input
+                  className="w-full bg-transparent"
+                  placeholder="如：潮汕宗祠建筑设计"
+                  value={newName}
+                  onInput={(e) => setNewName(e.detail.value)}
+                />
+              </View>
+            </View>
+            <View>
+              <Text className="block text-sm font-medium text-stone-700 mb-2">话题描述（可选）</Text>
+              <View className="bg-stone-50 rounded-xl p-4">
+                <Textarea
+                  style={{ width: '100%', minHeight: '80px', backgroundColor: 'transparent' }}
+                  placeholder="简单描述这个话题..."
+                  value={newDesc}
+                  onInput={(e) => setNewDesc(e.detail.value)}
+                  maxlength={200}
+                />
+              </View>
+            </View>
+            <View className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 border-stone-200"
+                onClick={() => setShowCreate(false)}
+              >
+                <Text>取消</Text>
+              </Button>
+              <Button
+                className="flex-1 bg-amber-700 hover:bg-amber-800 text-white"
+                onClick={handleCreate}
+                disabled={creating}
+              >
+                <Text>{creating ? '创建中...' : '创建'}</Text>
+              </Button>
+            </View>
+          </View>
+        </DialogContent>
+      </Dialog>
+    </View>
+  )
+}
+
+export default TopicsPage
