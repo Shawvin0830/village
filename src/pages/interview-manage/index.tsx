@@ -48,6 +48,7 @@ const InterviewManagePage = () => {
   const topicId = router.params.topicId || ''
   const subtopicId = router.params.subtopicId || ''
   const subName = decodeURIComponent(router.params.subName || '')
+  const editId = router.params.editId || ''
 
   const [quotes, setQuotes] = useState<QuoteItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -67,6 +68,22 @@ const InterviewManagePage = () => {
       const data = res.data?.data
       if (Array.isArray(data)) {
         setQuotes(data)
+        // 如果传入了 editId，自动打开对应的编辑表单
+        if (editId && !editingId) {
+          const targetQuote = data.find((q: QuoteItem) => q.id === editId)
+          if (targetQuote) {
+            setEditingId(targetQuote.id)
+            setForm({
+              intervieweeName: targetQuote.interviewee.name || '',
+              age: targetQuote.interviewee.age || '',
+              occupation: targetQuote.interviewee.occupation || '',
+              role: targetQuote.interviewee.role || '',
+              quote: targetQuote.quote || '',
+              fullInterview: targetQuote.full_interview || '',
+            })
+            setShowForm(true)
+          }
+        }
       }
     } catch (err) {
       console.error('获取采访记录失败:', err)
@@ -74,7 +91,7 @@ const InterviewManagePage = () => {
     } finally {
       setLoading(false)
     }
-  }, [topicId, subtopicId])
+  }, [topicId, subtopicId, editId, editingId])
 
   useLoad(() => {
     fetchQuotes()
