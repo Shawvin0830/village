@@ -14,6 +14,10 @@ export const subtopics = pgTable("subtopics", {
 	summary: text(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+	createdBy: varchar("created_by", { length: 36 }),
+	createdByName: varchar("created_by_name", { length: 100 }),
+	updatedBy: varchar("updated_by", { length: 36 }),
+	updatedByName: varchar("updated_by_name", { length: 100 }),
 }, (table) => [
 	index("subtopics_auth_level_idx").using("btree", table.authLevel.asc().nullsLast().op("text_ops")),
 	index("subtopics_topic_id_idx").using("btree", table.topicId.asc().nullsLast().op("text_ops")),
@@ -61,6 +65,10 @@ export const interviewRecords = pgTable("interview_records", {
 	aiAnalysis: jsonb("ai_analysis"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+	createdBy: varchar("created_by", { length: 36 }),
+	createdByName: varchar("created_by_name", { length: 100 }),
+	updatedBy: varchar("updated_by", { length: 36 }),
+	updatedByName: varchar("updated_by_name", { length: 100 }),
 }, (table) => [
 	index("interview_records_status_idx").using("btree", table.status.asc().nullsLast().op("text_ops")),
 	index("interview_records_subtopic_id_idx").using("btree", table.subtopicId.asc().nullsLast().op("text_ops")),
@@ -90,6 +98,10 @@ export const interviewees = pgTable("interviewees", {
 	confirmedAt: timestamp("confirmed_at", { withTimezone: true, mode: 'string' }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+	createdBy: varchar("created_by", { length: 36 }),
+	createdByName: varchar("created_by_name", { length: 100 }),
+	updatedBy: varchar("updated_by", { length: 36 }),
+	updatedByName: varchar("updated_by_name", { length: 100 }),
 }, (table) => [
 	index("interviewees_topic_id_idx").using("btree", table.topicId.asc().nullsLast().op("text_ops")),
 	index("interviewees_auth_status_idx").using("btree", table.authStatus.asc().nullsLast().op("text_ops")),
@@ -166,6 +178,10 @@ export const topics = pgTable("topics", {
 	status: varchar({ length: 20 }).default('active').notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+	createdBy: varchar("created_by", { length: 36 }),
+	createdByName: varchar("created_by_name", { length: 100 }),
+	updatedBy: varchar("updated_by", { length: 36 }),
+	updatedByName: varchar("updated_by_name", { length: 100 }),
 }, (table) => [
 	index("topics_created_at_idx").using("btree", table.createdAt.asc().nullsLast().op("timestamptz_ops")),
 	index("topics_status_idx").using("btree", table.status.asc().nullsLast().op("text_ops")),

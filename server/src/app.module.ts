@@ -7,9 +7,10 @@ import { InterviewRecordsModule } from '@/interview-records/interview-records.mo
 import { MaterialsModule } from '@/materials/materials.module';
 import { SkillsModule } from '@/skills/skills.module';
 import { InterviewScriptsModule } from '@/interview-scripts/interview-scripts.module';
+import { OperatorsModule } from '@/operators/operators.module';
 
 @Module({
-  imports: [TopicsModule, InterviewPlansModule, InterviewRecordsModule, MaterialsModule, SkillsModule, InterviewScriptsModule],
+  imports: [OperatorsModule, TopicsModule, InterviewPlansModule, InterviewRecordsModule, MaterialsModule, SkillsModule, InterviewScriptsModule],
   controllers: [AppController],
   providers: [AppService],
 })
