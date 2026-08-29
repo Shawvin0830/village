@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, HttpCode } from '@nestjs/common';
 import { TopicsService } from './topics.service';
 
 @Controller('topics')
@@ -126,6 +126,68 @@ export class TopicsController {
     @Param('subId') subId: string,
   ) {
     const data = await this.topicsService.deleteSubtopic(id, subId);
+    return { code: 200, msg: 'success', data };
+  }
+
+  /** 获取子话题下的采访记录（quotes）列表 */
+  @Get(':id/subtopics/:subId/quotes')
+  @HttpCode(200)
+  async getQuotes(
+    @Param('id') id: string,
+    @Param('subId') subId: string,
+  ) {
+    const data = await this.topicsService.getQuotes(id, subId);
+    return { code: 200, msg: 'success', data };
+  }
+
+  /** 创建采访记录 */
+  @Post(':id/subtopics/:subId/quotes')
+  @HttpCode(200)
+  async createQuote(
+    @Param('id') id: string,
+    @Param('subId') subId: string,
+    @Body() body: {
+      interviewee_name: string;
+      age?: string | null;
+      occupation?: string | null;
+      role?: string | null;
+      quote?: string | null;
+      full_interview: string;
+    },
+  ) {
+    const data = await this.topicsService.createQuote(id, subId, body);
+    return { code: 200, msg: 'success', data };
+  }
+
+  /** 更新采访记录 */
+  @Put(':id/subtopics/:subId/quotes/:quoteId')
+  @HttpCode(200)
+  async updateQuote(
+    @Param('id') id: string,
+    @Param('subId') subId: string,
+    @Param('quoteId') quoteId: string,
+    @Body() body: {
+      interviewee_name?: string;
+      age?: string | null;
+      occupation?: string | null;
+      role?: string | null;
+      quote?: string | null;
+      full_interview?: string;
+    },
+  ) {
+    const data = await this.topicsService.updateQuote(id, subId, quoteId, body);
+    return { code: 200, msg: 'success', data };
+  }
+
+  /** 删除采访记录 */
+  @Delete(':id/subtopics/:subId/quotes/:quoteId')
+  @HttpCode(200)
+  async deleteQuote(
+    @Param('id') id: string,
+    @Param('subId') subId: string,
+    @Param('quoteId') quoteId: string,
+  ) {
+    const data = await this.topicsService.deleteQuote(id, subId, quoteId);
     return { code: 200, msg: 'success', data };
   }
 

@@ -446,4 +446,253 @@ export class TopicsService {
       nextSteps,
     };
   }
+
+  /** 获取子话题下的采访记录列表（quotes 格式） */
+  async getQuotes(topicId: string, subtopicId: string) {
+    const { data: records, error } = await this.client
+      .from('interview_records')
+      .select('id, created_at, mandarin_text, dialect_original, transcript_text, ai_analysis')
+      .eq('topic_id', topicId)
+      .eq('subtopic_id', subtopicId)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(`查询采访记录失败: ${error.message}`);
+
+    const { data: people } = await this.client
+      .from('interviewees')
+      .select('id, name, age, occupation, role')
+      .eq('topic_id', topicId);
+
+    const peopleByName = new Map<string, Record<string, unknown>>();
+    for (const person of people || []) {
+      peopleByName.set(String(person.name), person);
+    }
+
+    const quotes = ((records || []) as InterviewRecord[]).map((record, index) => {
+      const segments = extractSegments(record);
+      const text = getRecordText(record);
+      const firstSegment = segments[0];
+      const base = extractPersonBase(record);
+      const savedPerson = peopleByName.get(base.name);
+      const quoteText =
+        shortText(firstSegment?.quote || firstSegment?.source_text || firstSegment?.mandarin_text || firstSegment?.summary || text, 160) ||
+        '暂无摘录';
+
+      return {
+        id: record.id,
+        quote: quoteText,
+        summary: shortText(firstSegment?.summary || text, 120),
+        full_interview: text || '',
+        created_at: record.created_at || null,
+        interviewee: {
+          id: savedPerson?.id || `temp-${index}-${record.id}`,
+          name: String(savedPerson?.name || base.name),
+          age: savedPerson?.age || base.age || null,
+          occupation: savedPerson?.occupation || base.occupation || null,
+          role: savedPerson?.role || base.role || null,
+        },
+      };
+    });
+
+    return quotes;
+  }
+
+  /** 创建采访记录 */
+  async createQuote(
+    topicId: string,
+    subtopicId: string,
+    body: {
+      interviewee_name: string;
+      age?: string | null;
+      occupation?: string | null;
+      role?: string | null;
+      quote?: string | null;
+      full_interview: string;
+    },
+  ) {
+    // 1. 查找或创建受访人
+    let intervieweeId: string | null = null;
+    const { data: existing } = await this.client
+      .from('interviewees')
+      .select('id')
+      .eq('topic_id', topicId)
+      .eq('name', body.interviewee_name)
+      .maybeSingle();
+
+    if (existing) {
+      intervieweeId = existing.id;
+      // 更新受访人信息
+      const updateData: Record<string, unknown> = {};
+      if (body.age) updateData.age = body.age;
+      if (body.occupation) updateData.occupation = body.occupation;
+      if (body.role) updateData.role = body.role;
+      if (Object.keys(updateData).length > 0) {
+        await this.client.from('interviewees').update(updateData).eq('id', intervieweeId);
+      }
+    } else {
+      const { data: newPerson, error: personError } = await this.client
+        .from('interviewees')
+        .insert({
+          topic_id: topicId,
+          name: body.interviewee_name,
+          age: body.age || null,
+          occupation: body.occupation || null,
+          role: body.role || null,
+        })
+        .select('id')
+        .single();
+      if (personError) throw new Error(`创建受访人失败: ${personError.message}`);
+      intervieweeId = newPerson.id;
+    }
+
+    // 2. 创建采访记录
+    const aiAnalysis = {
+      interviewee: {
+        name: body.interviewee_name,
+        age: body.age || null,
+        occupation: body.occupation || null,
+        role: body.role || null,
+      },
+      segments: [
+        {
+          quote: body.quote || shortText(body.full_interview, 160),
+          summary: shortText(body.full_interview, 120),
+        },
+      ],
+    };
+
+    const { data: record, error: recordError } = await this.client
+      .from('interview_records')
+      .insert({
+        topic_id: topicId,
+        subtopic_id: subtopicId,
+        mandarin_text: body.full_interview,
+        status: 'completed',
+        ai_analysis: aiAnalysis,
+      })
+      .select()
+      .single();
+    if (recordError) throw new Error(`创建采访记录失败: ${recordError.message}`);
+
+    return {
+      id: record.id,
+      quote: body.quote || shortText(body.full_interview, 160),
+      full_interview: body.full_interview,
+      created_at: record.created_at,
+      interviewee: {
+        id: intervieweeId,
+        name: body.interviewee_name,
+        age: body.age || null,
+        occupation: body.occupation || null,
+        role: body.role || null,
+      },
+    };
+  }
+
+  /** 更新采访记录 */
+  async updateQuote(
+    topicId: string,
+    subtopicId: string,
+    quoteId: string,
+    body: {
+      interviewee_name?: string;
+      age?: string | null;
+      occupation?: string | null;
+      role?: string | null;
+      quote?: string | null;
+      full_interview?: string;
+    },
+  ) {
+    // 1. 获取现有记录
+    const { data: existing, error: fetchError } = await this.client
+      .from('interview_records')
+      .select('id, ai_analysis, mandarin_text')
+      .eq('id', quoteId)
+      .eq('topic_id', topicId)
+      .maybeSingle();
+    if (fetchError) throw new Error(`查询记录失败: ${fetchError.message}`);
+    if (!existing) throw new Error('记录不存在');
+
+    // 2. 更新受访人信息
+    if (body.interviewee_name) {
+      const oldAnalysis = (existing.ai_analysis || {}) as Record<string, unknown>;
+      const oldInterviewee = (oldAnalysis.interviewee || {}) as Record<string, unknown>;
+      const oldName = String(oldInterviewee.name || '');
+
+      const { data: person } = await this.client
+        .from('interviewees')
+        .select('id')
+        .eq('topic_id', topicId)
+        .eq('name', oldName)
+        .maybeSingle();
+
+      if (person) {
+        const updateData: Record<string, unknown> = { name: body.interviewee_name };
+        if (body.age !== undefined) updateData.age = body.age;
+        if (body.occupation !== undefined) updateData.occupation = body.occupation;
+        if (body.role !== undefined) updateData.role = body.role;
+        await this.client.from('interviewees').update(updateData).eq('id', person.id);
+      }
+    }
+
+    // 3. 更新采访记录
+    const fullText = body.full_interview || existing.mandarin_text || '';
+    const quoteText = body.quote || shortText(fullText, 160);
+
+    const newAnalysis = {
+      interviewee: {
+        name: body.interviewee_name || '',
+        age: body.age || null,
+        occupation: body.occupation || null,
+        role: body.role || null,
+      },
+      segments: [
+        {
+          quote: quoteText,
+          summary: shortText(fullText, 120),
+        },
+      ],
+    };
+
+    const updateData: Record<string, unknown> = {
+      ai_analysis: newAnalysis,
+      updated_at: new Date().toISOString(),
+    };
+    if (body.full_interview !== undefined) {
+      updateData.mandarin_text = body.full_interview;
+    }
+
+    const { data: record, error: updateError } = await this.client
+      .from('interview_records')
+      .update(updateData)
+      .eq('id', quoteId)
+      .select()
+      .single();
+    if (updateError) throw new Error(`更新采访记录失败: ${updateError.message}`);
+
+    return {
+      id: record.id,
+      quote: quoteText,
+      full_interview: fullText,
+      created_at: record.created_at,
+      interviewee: {
+        name: body.interviewee_name || '',
+        age: body.age || null,
+        occupation: body.occupation || null,
+        role: body.role || null,
+      },
+    };
+  }
+
+  /** 删除采访记录 */
+  async deleteQuote(topicId: string, subtopicId: string, quoteId: string) {
+    const { error } = await this.client
+      .from('interview_records')
+      .delete()
+      .eq('id', quoteId)
+      .eq('topic_id', topicId)
+      .eq('subtopic_id', subtopicId);
+    if (error) throw new Error(`删除采访记录失败: ${error.message}`);
+    return { success: true };
+  }
 }
