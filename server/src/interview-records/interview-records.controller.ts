@@ -98,8 +98,11 @@ export class InterviewRecordsController {
   /** 确认采访记录（归入资料库） */
   @Post(':recordId/confirm')
   @HttpCode(200)
-  async confirmRecord(@Param('recordId') recordId: string) {
-    const data = await this.recordsService.confirmRecord(recordId);
+  async confirmRecord(
+    @Param('recordId') recordId: string,
+    @Body() body: { edited_text?: string },
+  ) {
+    const data = await this.recordsService.confirmRecord(recordId, body.edited_text);
     return { code: 200, msg: 'success', data };
   }
 

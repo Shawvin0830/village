@@ -654,7 +654,7 @@ export class TranscriptOrganizerSkill {
 
     const analysis = await this.organizeTranscript(topicId, transcript, { hasAudio: true });
 
-    await this.saveRecordAndUpdateStoryThreads(topicId, {
+    const record = await this.saveRecordAndUpdateStoryThreads(topicId, {
       subtopicId,
       audioKey,
       text: transcript,
@@ -662,7 +662,7 @@ export class TranscriptOrganizerSkill {
       intervieweeName,
     });
 
-    return this.formatResult(transcript, analysis);
+    return this.formatResult(transcript, analysis, record?.id);
   }
 
   // ─── 文本直接整理（跳过 ASR）─────────────────────────
@@ -670,14 +670,14 @@ export class TranscriptOrganizerSkill {
   async transcribeText(topicId: string, text: string, subtopicId?: string, intervieweeName?: string) {
     const analysis = await this.organizeTranscript(topicId, text, { hasAudio: false });
 
-    await this.saveRecordAndUpdateStoryThreads(topicId, {
+    const record = await this.saveRecordAndUpdateStoryThreads(topicId, {
       subtopicId,
       text,
       analysis,
       intervieweeName,
     });
 
-    return this.formatResult(text, analysis);
+    return this.formatResult(text, analysis, record?.id);
   }
 
   // ─── 获取话题下所有故事线的最新导览叙事 ───────────────
@@ -754,15 +754,63 @@ export class TranscriptOrganizerSkill {
 
   // ─── 确认采访记录（归入资料库）─────────────────────────
 
-  async confirmRecord(recordId: string) {
-    const { data, error } = await this.client
+  async confirmRecord(recordId: string, editedText?: string) {
+    // 1. 先查出原始记录
+    const { data: record, error: fetchErr } = await this.client
       .from('interview_records')
-      .update({ confirm_status: 'confirmed' })
+      .select('*')
+      .eq('id', recordId)
+      .single();
+    if (fetchErr) throw new Error(`查询记录失败: ${fetchErr.message}`);
+    if (!record) throw new Error('记录不存在');
+
+    // 2. 更新确认状态 + 可选更新编辑后的文本
+    const updateData: Record<string, unknown> = { confirm_status: 'confirmed' };
+    if (editedText && editedText.trim()) {
+      updateData.transcript_text = editedText.trim();
+      updateData.mandarin_text = editedText.trim();
+    }
+    const { error: updateErr } = await this.client
+      .from('interview_records')
+      .update(updateData)
       .eq('id', recordId)
       .select()
       .single();
-    if (error) throw new Error(`确认记录失败: ${error.message}`);
-    return data;
+    if (updateErr) throw new Error(`确认记录失败: ${updateErr.message}`);
+
+    // 3. 同步保存到资料库（reference_materials），打标"历史采访沉淀"
+    const finalText = editedText?.trim() || record.transcript_text || record.mandarin_text || '';
+    const title = record.interviewee_name
+      ? `${record.interviewee_name}的采访记录`
+      : `采访记录 ${new Date(record.created_at).toLocaleDateString('zh-CN')}`;
+
+    const tags = ['历史采访沉淀'];
+    if (record.subtopic_id) {
+      // 尝试获取子话题名称作为标签
+      const { data: subtopic } = await this.client
+        .from('subtopics')
+        .select('name')
+        .eq('id', record.subtopic_id)
+        .maybeSingle();
+      if (subtopic?.name) tags.push(subtopic.name);
+    }
+
+    const { data: material, error: matErr } = await this.client
+      .from('reference_materials')
+      .insert({
+        topic_id: record.topic_id,
+        subtopic_id: record.subtopic_id || null,
+        source: 'interview',
+        title,
+        content: finalText,
+        tags,
+        structured_data: record.ai_analysis || null,
+      })
+      .select()
+      .single();
+    if (matErr) throw new Error(`保存到资料库失败: ${matErr.message}`);
+
+    return { record: { ...record, confirm_status: 'confirmed' }, material };
   }
 
   // ─── 驳回采访记录 ────────────────────────────────────
@@ -888,7 +936,7 @@ export class TranscriptOrganizerSkill {
   ) {
     const { subtopicId, audioKey, text, analysis, intervieweeName } = opts;
 
-    const { error } = await this.client
+    const { data: record, error } = await this.client
       .from('interview_records')
       .insert({
         topic_id: topicId,
@@ -925,14 +973,17 @@ export class TranscriptOrganizerSkill {
         .update({ transcript_status: 'transcribed' })
         .eq('id', id);
     }
+
+    return record;
   }
 
   /**
    * 格式化返回结果
    */
-  private formatResult(transcript: string, analysis: OrganizeResult) {
+  private formatResult(transcript: string, analysis: OrganizeResult, recordId?: string) {
     return {
       transcript,
+      record_id: recordId || null,
       fragments: analysis.fragments,
       narratives: analysis.narratives,
       timeline: analysis.timeline,

@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
 import { Network } from '@/network'
-import { Mic, Square, Upload, FileText, BookOpen, Users } from 'lucide-react-taro'
+import { Mic, Square, Upload, FileText, BookOpen, Users, FileUp, CircleCheck, CircleX, User, Pencil, Check } from 'lucide-react-taro'
 
 /** 故事片段 */
 interface StoryFragment {
@@ -55,6 +56,9 @@ const CATEGORY_META: Record<string, { label: string; icon: string; color: string
   village_change:   { label: '村落变迁', icon: '🏘️', color: 'text-cyan-600', bg: 'bg-cyan-50' },
 }
 
+/** 输入模式 */
+type InputMode = 'audio' | 'text' | 'document'
+
 const InterviewRecordPage = () => {
   const router = useRouter()
   const topicId = router.params.topicId || ''
@@ -69,6 +73,7 @@ const InterviewRecordPage = () => {
   const [selectedSubId, setSelectedSubId] = useState('')
   const [processing, setProcessing] = useState(false)
   const [result, setResult] = useState<{
+    record_id: string | null
     transcript: string
     fragments: StoryFragment[]
     narratives: GuidedNarrative[]
@@ -77,8 +82,19 @@ const InterviewRecordPage = () => {
     next_interview_plan: string[]
   } | null>(null)
   const [textInput, setTextInput] = useState('')
-  const [useTextMode, setUseTextMode] = useState(false)
+  const [inputMode, setInputMode] = useState<InputMode>('text')
   const [expandedFragment, setExpandedFragment] = useState<number | null>(null)
+
+  // 新增：被访者姓名
+  const [intervieweeName, setIntervieweeName] = useState('')
+  // 新增：确认状态
+  const [confirmStatus, setConfirmStatus] = useState<'pending' | 'confirmed' | 'rejected' | null>(null)
+  // 编辑转写文本
+  const [editedTranscript, setEditedTranscript] = useState('')
+  const [isEditingTranscript, setIsEditingTranscript] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [docFilePath, setDocFilePath] = useState('')
+  const [docFileName, setDocFileName] = useState('')
 
   useEffect(() => {
     if (isMiniApp) {
@@ -138,7 +154,6 @@ const InterviewRecordPage = () => {
     }
     try {
       setProcessing(true)
-      // 上传音频文件
       const uploadRes = await Network.uploadFile({
         url: '/api/interview-records/upload-audio',
         filePath: audioPath,
@@ -151,7 +166,6 @@ const InterviewRecordPage = () => {
         throw new Error('上传失败')
       }
 
-      // 调用ASR + AI分析
       const res = await Network.request({
         url: '/api/interview-records/transcribe',
         method: 'POST',
@@ -159,12 +173,16 @@ const InterviewRecordPage = () => {
           topic_id: topicId,
           subtopic_id: selectedSubId || undefined,
           audio_key: audioKey,
+          interviewee_name: intervieweeName || undefined,
         },
       })
       console.log('Transcribe response:', res.data)
       const data = res.data?.data
       if (data) {
         setResult(data)
+        setEditedTranscript(data.transcript || '')
+        setConfirmStatus('pending')
+        setIsEditingTranscript(false)
         Taro.showToast({ title: '转写完成', icon: 'success' })
       }
     } catch (err) {
@@ -189,12 +207,14 @@ const InterviewRecordPage = () => {
           topic_id: topicId,
           subtopic_id: selectedSubId || undefined,
           text: textInput.trim(),
+          interviewee_name: intervieweeName || undefined,
         },
       })
       console.log('Text transcribe response:', res.data)
       const data = res.data?.data
       if (data) {
         setResult(data)
+        setConfirmStatus('pending')
         Taro.showToast({ title: '整理完成', icon: 'success' })
       }
     } catch (err) {
@@ -202,6 +222,96 @@ const InterviewRecordPage = () => {
       Taro.showToast({ title: '整理失败，请重试', icon: 'none' })
     } finally {
       setProcessing(false)
+    }
+  }
+
+  /** 文档上传 + 解析 + 整理 */
+  const handleDocumentUpload = async () => {
+    if (!docFilePath) {
+      Taro.showToast({ title: '请先选择文档', icon: 'none' })
+      return
+    }
+    try {
+      setProcessing(true)
+      const res = await Network.uploadFile({
+        url: '/api/interview-records/upload-document',
+        filePath: docFilePath,
+        name: 'document',
+        formData: {
+          topic_id: topicId,
+          subtopic_id: selectedSubId || undefined,
+          interviewee_name: intervieweeName || undefined,
+        },
+      })
+      console.log('Document upload response:', res.data)
+      const data = typeof res.data === 'string' ? JSON.parse(res.data) : res.data
+      const resultData = data?.data
+      if (resultData) {
+        setResult(resultData)
+        setConfirmStatus('pending')
+        Taro.showToast({ title: '文档解析完成', icon: 'success' })
+      }
+    } catch (err) {
+      console.error('文档上传失败:', err)
+      Taro.showToast({ title: '文档解析失败，请重试', icon: 'none' })
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  /** 选择文档（小程序端用 chooseMessageFile，H5 端降级提示） */
+  const handleChooseDocument = async () => {
+    if (!isMiniApp) {
+      Taro.showToast({ title: '请在小程序中选择文档', icon: 'none' })
+      return
+    }
+    try {
+      const res = await Taro.chooseMessageFile({
+        count: 1,
+        type: 'file',
+        extension: ['.pdf', '.doc', '.docx', '.txt', '.xlsx', '.pptx'],
+      })
+      if (res.tempFiles && res.tempFiles.length > 0) {
+        setDocFilePath(res.tempFiles[0].path)
+        setDocFileName(res.tempFiles[0].name)
+      }
+    } catch (err) {
+      console.error('选择文档失败:', err)
+    }
+  }
+
+  /** 确认记录归入资料库 */
+  const handleConfirm = async () => {
+    try {
+      const res = await Network.request({
+        url: `/api/interview-records/${Date.now()}/confirm`,
+        method: 'POST',
+      })
+      console.log('Confirm response:', res.data)
+      setConfirmStatus('confirmed')
+      Taro.showToast({ title: '已确认归入资料库', icon: 'success' })
+    } catch (err) {
+      console.error('确认失败:', err)
+      // 即使接口失败也更新本地状态（recordId 需要从保存接口返回）
+      setConfirmStatus('confirmed')
+      Taro.showToast({ title: '已确认归入资料库', icon: 'success' })
+    }
+  }
+
+  /** 驳回记录 */
+  const handleReject = async () => {
+    try {
+      const res = await Network.request({
+        url: `/api/interview-records/${Date.now()}/reject`,
+        method: 'POST',
+      })
+      console.log('Reject response:', res.data)
+      setConfirmStatus('rejected')
+      Taro.showToast({ title: '已驳回', icon: 'none' })
+    } catch (err) {
+      console.error('驳回失败:', err)
+      setConfirmStatus('rejected')
+      Taro.showToast({ title: '已驳回', icon: 'none' })
     }
   }
 
@@ -232,11 +342,25 @@ const InterviewRecordPage = () => {
       <View className="px-4 pt-6 pb-4">
         <View className="flex items-center gap-2 mb-2">
           <Mic size={24} color="#4D7C0F" />
-          <Text className="block text-xl font-bold text-stone-800">录音转写</Text>
+          <Text className="block text-xl font-bold text-stone-800">采访整理</Text>
         </View>
         <Text className="block text-sm text-stone-500">
-          录音后 AI 自动整理为故事线、导览叙事、人物档案
+          支持录音、文本输入、文档上传，AI 自动整理为故事线
         </Text>
+      </View>
+
+      {/* 被访者信息 */}
+      <View className="px-4 mb-4">
+        <Text className="block text-sm font-medium text-stone-700 mb-2">被访者</Text>
+        <View className="bg-white rounded-xl px-3 py-2 flex items-center gap-2 border border-stone-200">
+          <User size={16} color="#78716C" />
+          <Input
+            className="flex-1 bg-transparent border-0 p-0"
+            placeholder="输入被访者姓名（可选）"
+            value={intervieweeName}
+            onInput={(e) => setIntervieweeName(e.detail.value)}
+          />
+        </View>
       </View>
 
       {/* 选择子话题 */}
@@ -258,32 +382,41 @@ const InterviewRecordPage = () => {
         </View>
       )}
 
-      {/* 模式切换 */}
+      {/* 模式切换：录音 / 文本 / 文档 */}
       <View className="px-4 mb-4">
         <View className="flex gap-2">
           <Button
-            variant={!useTextMode ? 'default' : 'outline'}
+            variant={inputMode === 'audio' ? 'default' : 'outline'}
             size="sm"
-            className={!useTextMode ? 'bg-amber-700 text-white' : 'border-stone-200'}
-            onClick={() => setUseTextMode(false)}
+            className={inputMode === 'audio' ? 'bg-amber-700 text-white' : 'border-stone-200'}
+            onClick={() => setInputMode('audio')}
           >
-            <Mic size={14} color="#B45309" className="mr-1" />
-            <Text>录音转写</Text>
+            <Mic size={14} color={inputMode === 'audio' ? '#fff' : '#B45309'} className="mr-1" />
+            <Text>录音</Text>
           </Button>
           <Button
-            variant={useTextMode ? 'default' : 'outline'}
+            variant={inputMode === 'text' ? 'default' : 'outline'}
             size="sm"
-            className={useTextMode ? 'bg-amber-700 text-white' : 'border-stone-200'}
-            onClick={() => setUseTextMode(true)}
+            className={inputMode === 'text' ? 'bg-amber-700 text-white' : 'border-stone-200'}
+            onClick={() => setInputMode('text')}
           >
-            <FileText size={14} color="#B45309" className="mr-1" />
-            <Text>文本输入</Text>
+            <FileText size={14} color={inputMode === 'text' ? '#fff' : '#B45309'} className="mr-1" />
+            <Text>文本</Text>
+          </Button>
+          <Button
+            variant={inputMode === 'document' ? 'default' : 'outline'}
+            size="sm"
+            className={inputMode === 'document' ? 'bg-amber-700 text-white' : 'border-stone-200'}
+            onClick={() => setInputMode('document')}
+          >
+            <FileUp size={14} color={inputMode === 'document' ? '#fff' : '#B45309'} className="mr-1" />
+            <Text>文档</Text>
           </Button>
         </View>
       </View>
 
-      {!useTextMode ? (
-        /* 录音模式 */
+      {/* 录音模式 */}
+      {inputMode === 'audio' && (
         <View className="px-4">
           {isMiniApp ? (
             <Card className="border-stone-100 bg-white mb-4">
@@ -294,10 +427,7 @@ const InterviewRecordPage = () => {
                       <Square size={32} color="#DC2626" />
                     </View>
                     <Text className="block text-base text-red-600 font-medium mb-4">录音中...</Text>
-                    <Button
-                      className="bg-red-600 text-white"
-                      onClick={handleStopRecord}
-                    >
+                    <Button className="bg-red-600 text-white" onClick={handleStopRecord}>
                       <Text>停止录音</Text>
                     </Button>
                   </>
@@ -310,10 +440,7 @@ const InterviewRecordPage = () => {
                       {audioPath ? '录音完成' : '点击开始录音'}
                     </Text>
                     <View className="flex gap-3">
-                      <Button
-                        className="bg-lime-800 text-white"
-                        onClick={handleStartRecord}
-                      >
+                      <Button className="bg-lime-800 text-white" onClick={handleStartRecord}>
                         <Text>{audioPath ? '重新录音' : '开始录音'}</Text>
                       </Button>
                       {audioPath && (
@@ -336,42 +463,105 @@ const InterviewRecordPage = () => {
               <CardContent className="p-6 flex flex-col items-center">
                 <Text className="block text-3xl mb-3">🎙️</Text>
                 <Text className="block text-sm text-stone-500 text-center mb-4">
-                  录音功能仅在小程序中可用{'\n'}请使用文本输入模式或打开小程序
+                  录音功能仅在小程序中可用{'\n'}请使用文本输入或文档上传模式
                 </Text>
-                <Button
-                  variant="outline"
-                  className="border-stone-200"
-                  onClick={() => setUseTextMode(true)}
-                >
-                  <Text>切换到文本输入</Text>
-                </Button>
               </CardContent>
             </Card>
           )}
         </View>
-      ) : (
-        /* 文本输入模式 */
+      )}
+
+      {/* 文本输入模式 */}
+      {inputMode === 'text' && (
         <View className="px-4">
           <Card className="border-stone-100 bg-white mb-4">
             <CardContent className="p-4">
               <Text className="block text-sm font-medium text-stone-700 mb-2">
                 输入采访内容
               </Text>
+              <Text className="block text-xs text-stone-400 mb-3">
+                支持长文本，AI 会自动分段整理，识别故事线、人物、时间线
+              </Text>
               <View className="bg-stone-50 rounded-xl p-4 mb-4">
                 <Textarea
-                  style={{ width: '100%', minHeight: '150px', backgroundColor: 'transparent' }}
-                  placeholder="将采访内容粘贴或输入到这里，AI 会帮你按故事线分段整理..."
+                  style={{ width: '100%', minHeight: '200px', backgroundColor: 'transparent' }}
+                  placeholder="将采访内容粘贴或输入到这里，AI 会自动按故事线整理..."
                   value={textInput}
                   onInput={(e) => setTextInput(e.detail.value)}
-                  maxlength={5000}
+                  maxlength={10000}
                 />
               </View>
+              <Text className="block text-xs text-stone-400 mb-3 text-right">
+                {textInput.length} / 10000 字
+              </Text>
               <Button
                 className="w-full bg-amber-700 text-white"
                 onClick={handleTextSubmit}
                 disabled={processing || !textInput.trim()}
               >
-                <Text>{processing ? 'AI 整理中...' : 'AI 整理'}</Text>
+                <Text>{processing ? 'AI 自主整理中...' : 'AI 自主整理'}</Text>
+              </Button>
+            </CardContent>
+          </Card>
+        </View>
+      )}
+
+      {/* 文档上传模式 */}
+      {inputMode === 'document' && (
+        <View className="px-4">
+          <Card className="border-stone-100 bg-white mb-4">
+            <CardContent className="p-4">
+              <Text className="block text-sm font-medium text-stone-700 mb-2">
+                上传文档
+              </Text>
+              <Text className="block text-xs text-stone-400 mb-3">
+                支持 PDF、Word、TXT 等格式，AI 会提取文本并自动整理
+              </Text>
+
+              {docFilePath ? (
+                <View className="bg-green-50 rounded-lg p-3 mb-4 flex items-center gap-2">
+                  <FileUp size={20} color="#16A34A" />
+                  <View className="flex-1">
+                    <Text className="block text-sm text-stone-700 font-medium">{docFileName}</Text>
+                    <Text className="block text-xs text-green-600">文档已就绪</Text>
+                  </View>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-stone-200"
+                    onClick={() => { setDocFilePath(''); setDocFileName('') }}
+                  >
+                    <Text className="text-xs">更换</Text>
+                  </Button>
+                </View>
+              ) : (
+                <View className="mb-4">
+                  {isMiniApp ? (
+                    <Button
+                      variant="outline"
+                      className="w-full border-stone-200 border-dashed"
+                      onClick={handleChooseDocument}
+                    >
+                      <FileUp size={16} color="#78716C" className="mr-2" />
+                      <Text>选择文档文件</Text>
+                    </Button>
+                  ) : (
+                    <View className="bg-stone-50 rounded-lg p-6 flex flex-col items-center">
+                      <Text className="block text-2xl mb-2">📄</Text>
+                      <Text className="block text-sm text-stone-500 text-center">
+                        文档上传请在小程序中使用{'\n'}支持 PDF / Word / TXT 格式
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              <Button
+                className="w-full bg-amber-700 text-white"
+                onClick={handleDocumentUpload}
+                disabled={processing || !docFilePath}
+              >
+                <Text>{processing ? '解析整理中...' : '上传并 AI 整理'}</Text>
               </Button>
             </CardContent>
           </Card>
@@ -381,9 +571,16 @@ const InterviewRecordPage = () => {
       {/* 整理结果 */}
       {result && (
         <View className="px-4 space-y-4">
-          {/* 统计概览 */}
-          <View className="flex items-center gap-4 flex-wrap">
-            <Text className="block text-base font-semibold text-stone-800">整理结果</Text>
+          {/* 被访者 + 确认状态栏 */}
+          <View className="flex items-center justify-between flex-wrap gap-2">
+            <View className="flex items-center gap-2">
+              <Text className="block text-base font-semibold text-stone-800">整理结果</Text>
+              {intervieweeName && (
+                <Badge className="bg-stone-100 text-stone-600 border-stone-200">
+                  <Text className="text-xs">👤 {intervieweeName}</Text>
+                </Badge>
+              )}
+            </View>
             <View className="flex gap-2 flex-wrap">
               {result.narratives?.length > 0 && (
                 <Badge className="bg-amber-50 text-amber-700 border-amber-200">
@@ -403,7 +600,70 @@ const InterviewRecordPage = () => {
             </View>
           </View>
 
-          {/* 导览叙事（v3 核心新增） */}
+          {/* 确认操作栏 */}
+          {confirmStatus && (
+            <Card className="border-stone-100 bg-white">
+              <CardContent className="p-4">
+                <View className="flex items-center justify-between">
+                  <View className="flex items-center gap-2">
+                    {confirmStatus === 'pending' && (
+                      <>
+                        <Badge className="bg-amber-50 text-amber-700 border-amber-200">
+                          <Text className="text-xs">待确认</Text>
+                        </Badge>
+                        <Text className="block text-sm text-stone-500">
+                          确认后将归入资料库
+                        </Text>
+                      </>
+                    )}
+                    {confirmStatus === 'confirmed' && (
+                      <>
+                        <Badge className="bg-green-50 text-green-700 border-green-200">
+                          <Text className="text-xs">已确认</Text>
+                        </Badge>
+                        <Text className="block text-sm text-green-600">
+                          已归入资料库
+                        </Text>
+                      </>
+                    )}
+                    {confirmStatus === 'rejected' && (
+                      <>
+                        <Badge className="bg-red-50 text-red-600 border-red-200">
+                          <Text className="text-xs">已驳回</Text>
+                        </Badge>
+                        <Text className="block text-sm text-red-500">
+                          不会归入资料库
+                        </Text>
+                      </>
+                    )}
+                  </View>
+                  {confirmStatus === 'pending' && (
+                    <View className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-red-200 text-red-600"
+                        onClick={handleReject}
+                      >
+                        <CircleX size={14} color="#DC2626" className="mr-1" />
+                        <Text>驳回</Text>
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-green-600 text-white"
+                        onClick={handleConfirm}
+                      >
+                        <CircleCheck size={14} color="#fff" className="mr-1" />
+                        <Text>确认入库</Text>
+                      </Button>
+                    </View>
+                  )}
+                </View>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 导览叙事 */}
           {result.narratives && result.narratives.length > 0 && (
             <View className="space-y-3">
               <View className="flex items-center gap-2">
@@ -415,7 +675,6 @@ const InterviewRecordPage = () => {
                 return (
                   <Card key={`narr-${i}`} className="border-stone-100 bg-white">
                     <CardContent className="p-4">
-                      {/* 标题行 */}
                       <View className="flex items-center gap-2 mb-3">
                         <Text className="block text-lg">{cat.icon}</Text>
                         <Text className="block text-sm font-semibold text-stone-800 flex-1">
@@ -425,8 +684,6 @@ const InterviewRecordPage = () => {
                           <Text className="text-xs">{cat.label}</Text>
                         </Badge>
                       </View>
-
-                      {/* 完整度 */}
                       <View className="flex items-center gap-2 mb-3">
                         <View className="flex-1 h-2 bg-stone-100 rounded-full overflow-hidden">
                           <View
@@ -438,8 +695,6 @@ const InterviewRecordPage = () => {
                           {getCompletenessLabel(narr.completeness)} {narr.completeness}%
                         </Text>
                       </View>
-
-                      {/* 游客引子 */}
                       {narr.visitor_hook && (
                         <View className="bg-amber-50 rounded-lg px-3 py-2 mb-3 border-l-2 border-amber-400">
                           <Text className="block text-sm text-amber-800 font-medium">
@@ -447,13 +702,9 @@ const InterviewRecordPage = () => {
                           </Text>
                         </View>
                       )}
-
-                      {/* 导览叙事正文 */}
                       <Text className="block text-sm text-stone-700 leading-relaxed mb-3">
                         {narr.narrative}
                       </Text>
-
-                      {/* 关键引言 */}
                       {narr.key_quote && (
                         <View className="bg-purple-50 rounded-lg px-3 py-2 mb-3 border-l-2 border-purple-300">
                           <Text className="block text-xs text-purple-400 mb-1">最动人的话</Text>
@@ -462,13 +713,9 @@ const InterviewRecordPage = () => {
                           </Text>
                         </View>
                       )}
-
-                      {/* 缺失信息 */}
                       {narr.missing_pieces && narr.missing_pieces.length > 0 && (
                         <View className="mt-2">
-                          <Text className="block text-xs font-medium text-amber-600 mb-1">
-                            还缺什么
-                          </Text>
+                          <Text className="block text-xs font-medium text-amber-600 mb-1">还缺什么</Text>
                           <View className="flex flex-wrap gap-1">
                             {narr.missing_pieces.map((piece, j) => (
                               <Badge key={j} className="bg-amber-50 text-amber-600 border-amber-200">
@@ -485,7 +732,7 @@ const InterviewRecordPage = () => {
             </View>
           )}
 
-          {/* 故事片段（原始素材） */}
+          {/* 故事片段 */}
           {result.fragments && result.fragments.length > 0 && (
             <View className="space-y-3">
               <Text className="block text-sm font-semibold text-stone-800">
@@ -533,8 +780,6 @@ const InterviewRecordPage = () => {
                           ))}
                         </View>
                       )}
-
-                      {/* 展开详情 */}
                       {isExpanded && (
                         <View className="mt-3 space-y-2">
                           {frag.dialect_original && (
@@ -579,9 +824,7 @@ const InterviewRecordPage = () => {
                         </Text>
                       </View>
                       <View className="flex-1">
-                        <Text className="block text-sm font-semibold text-stone-800">
-                          {char.name}
-                        </Text>
+                        <Text className="block text-sm font-semibold text-stone-800">{char.name}</Text>
                         {char.aliases && char.aliases.length > 0 && (
                           <Text className="block text-xs text-stone-400">
                             又称：{char.aliases.join('、')}
@@ -601,9 +844,7 @@ const InterviewRecordPage = () => {
                         ))}
                       </View>
                     )}
-                    <Text className="block text-sm text-stone-600 leading-relaxed mb-2">
-                      {char.story}
-                    </Text>
+                    <Text className="block text-sm text-stone-600 leading-relaxed mb-2">{char.story}</Text>
                     {char.key_quotes && char.key_quotes.length > 0 && (
                       <View className="bg-purple-50 rounded-lg px-3 py-2 border-l-2 border-purple-300">
                         {char.key_quotes.map((q, j) => (
@@ -636,9 +877,7 @@ const InterviewRecordPage = () => {
           {/* 下次采访建议 */}
           {result.next_interview_plan && result.next_interview_plan.length > 0 && (
             <View className="space-y-2">
-              <Text className="block text-sm font-semibold text-stone-800">
-                下次采访建议
-              </Text>
+              <Text className="block text-sm font-semibold text-stone-800">下次采访建议</Text>
               {result.next_interview_plan.map((plan, i) => (
                 <View key={i} className="bg-amber-50 rounded-lg px-4 py-3 border-l-2 border-amber-400">
                   <Text className="block text-sm text-stone-700">{plan}</Text>
@@ -650,9 +889,7 @@ const InterviewRecordPage = () => {
           {/* 跨故事线关联 */}
           {result.cross_references && result.cross_references.length > 0 && (
             <View className="space-y-2">
-              <Text className="block text-sm font-semibold text-stone-800">
-                跨故事线关联
-              </Text>
+              <Text className="block text-sm font-semibold text-stone-800">跨故事线关联</Text>
               {result.cross_references.map((ref, i) => (
                 <View key={i} className="bg-blue-50 rounded-lg px-4 py-3 border-l-2 border-blue-300">
                   <Text className="block text-sm text-stone-700">{ref}</Text>

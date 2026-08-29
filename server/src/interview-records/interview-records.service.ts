@@ -45,8 +45,8 @@ export class InterviewRecordsService {
   }
 
   /** 确认采访记录（归入资料库） */
-  async confirmRecord(recordId: string) {
-    return this.organizerSkill.confirmRecord(recordId);
+  async confirmRecord(recordId: string, editedText?: string) {
+    return this.organizerSkill.confirmRecord(recordId, editedText);
   }
 
   /** 驳回采访记录 */
