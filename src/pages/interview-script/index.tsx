@@ -51,6 +51,7 @@ export default function InterviewScriptPage() {
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editQuestions, setEditQuestions] = useState<Array<{ question?: string; child_version?: string; intent?: string; why_ask?: string; follow_up?: string[] }>>([])
+  const [showAllVersions, setShowAllVersions] = useState(false)
 
   useEffect(() => {
     if (topicId) {
@@ -229,25 +230,55 @@ export default function InterviewScriptPage() {
               <Text className="block text-xs text-stone-400 mt-1">
                 {formatDateTime(currentScript.created_at)}
               </Text>
-              {/* Version switcher */}
+              {/* Version switcher - show latest 3, collapse older */}
               {scripts.length > 1 && (
-                <View className="flex flex-wrap gap-2 mt-3">
-                  {scripts.map((script, index) => (
-                    <View
-                      key={script.id}
-                      className={`px-3 py-1 rounded-full text-xs cursor-pointer ${
-                        script.id === currentScript.id
-                          ? 'bg-stone-800 text-white'
-                          : 'bg-stone-100 text-stone-600'
-                      }`}
-                      onClick={() => setSelectedScript(script)}
-                    >
-                      {index === 0 ? '最新' : `v${scripts.length - index}`}
-                      <Text className="ml-1 text-xs opacity-70">
-                        {new Date(script.created_at).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
-                      </Text>
+                <View className="mt-3">
+                  <View className="flex flex-wrap gap-2">
+                    {scripts.slice(0, 3).map((script, index) => (
+                      <View
+                        key={script.id}
+                        className={`px-3 py-1 rounded-full text-xs cursor-pointer ${
+                          script.id === currentScript.id
+                            ? 'bg-stone-800 text-white'
+                            : 'bg-stone-100 text-stone-600'
+                        }`}
+                        onClick={() => setSelectedScript(script)}
+                      >
+                        {index === 0 ? '最新' : `v${scripts.length - index}`}
+                        <Text className="ml-1 text-xs opacity-70">
+                          {new Date(script.created_at).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
+                        </Text>
+                      </View>
+                    ))}
+                    {scripts.length > 3 && (
+                      <View
+                        className="px-3 py-1 rounded-full text-xs cursor-pointer bg-stone-50 text-stone-400"
+                        onClick={() => setShowAllVersions(!showAllVersions)}
+                      >
+                        {showAllVersions ? '收起' : `+${scripts.length - 3} 历史`}
+                      </View>
+                    )}
+                  </View>
+                  {showAllVersions && scripts.length > 3 && (
+                    <View className="flex flex-wrap gap-2 mt-2">
+                      {scripts.slice(3).map((script, index) => (
+                        <View
+                          key={script.id}
+                          className={`px-3 py-1 rounded-full text-xs cursor-pointer ${
+                            script.id === currentScript.id
+                              ? 'bg-stone-800 text-white'
+                              : 'bg-stone-100 text-stone-600'
+                          }`}
+                          onClick={() => setSelectedScript(script)}
+                        >
+                          v{scripts.length - index - 3}
+                          <Text className="ml-1 text-xs opacity-70">
+                            {new Date(script.created_at).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
+                          </Text>
+                        </View>
+                      ))}
                     </View>
-                  ))}
+                  )}
                 </View>
               )}
             </View>
