@@ -27,9 +27,9 @@ export class InterviewPlannerSkill {
   /**
    * 生成专业采访策划
    */
-  async generate(topicId: string) {
-    const context = await this.collectContext(topicId);
-    const plan = await this.generatePlan(context);
+  async generate(topicId: string, subtopicId?: string, requirements?: string) {
+    const context = await this.collectContext(topicId, subtopicId);
+    const plan = await this.generatePlan(context, requirements);
 
     const { data: savedPlan, error } = await this.client
       .from('interview_plans')
@@ -161,7 +161,7 @@ export class InterviewPlannerSkill {
   /**
    * 收集话题的完整上下文
    */
-  private async collectContext(topicId: string) {
+  private async collectContext(topicId: string, subtopicId?: string) {
     const { data: topic } = await this.client
       .from('topics')
       .select('id, name, description')
@@ -170,16 +170,28 @@ export class InterviewPlannerSkill {
 
     if (!topic) throw new Error('话题不存在');
 
-    const { data: subtopics } = await this.client
+    // 如果指定了子话题，只获取该子话题的信息
+    let subtopicsQuery = this.client
       .from('subtopics')
       .select('id, name, icon, transcript_status, summary')
       .eq('topic_id', topicId);
 
-    const { data: records } = await this.client
+    if (subtopicId) {
+      subtopicsQuery = subtopicsQuery.eq('id', subtopicId);
+    }
+    const { data: subtopics } = await subtopicsQuery;
+
+    // 如果指定了子话题，只获取该子话题的采访记录
+    let recordsQuery = this.client
       .from('interview_records')
       .select('transcript_text, dialect_original, mandarin_text, ai_analysis')
       .eq('topic_id', topicId)
       .eq('status', 'completed');
+
+    if (subtopicId) {
+      recordsQuery = recordsQuery.eq('subtopic_id', subtopicId);
+    }
+    const { data: records } = await recordsQuery;
 
     const { data: existingPlans } = await this.client
       .from('interview_plans')
@@ -225,7 +237,7 @@ export class InterviewPlannerSkill {
   /**
    * 调用 LLM 生成采访策划（V2 框架）
    */
-  private async generatePlan(context: Awaited<ReturnType<InterviewPlannerSkill['collectContext']>>) {
+  private async generatePlan(context: Awaited<ReturnType<InterviewPlannerSkill['collectContext']>>, requirements?: string) {
     const { topic, subtopics, records, existingPlan, materials } = context;
 
     const subtopicInfo = subtopics
@@ -391,7 +403,7 @@ ${recordInfo ? recordInfo.substring(0, 1500) : '暂无已有采访记录'}
 
 ## 已有策划
 ${existingPlanInfo}
-
+${requirements ? `\n## 用户的具体要求\n${requirements}\n` : ''}
 请为这个话题生成一份专业的采访策划。注意：
 1. 从10个维度中选取5-8个最相关的，不要全部覆盖
 2. 🧠 个人记忆 和 🔄 变化 永远必选
@@ -400,7 +412,8 @@ ${existingPlanInfo}
 5. 小孩版问题要足够简单，让8-12岁的孩子能直接问出口
 6. 追问锦囊要根据本次选取的维度，选择相关的追问类型
 7. **最重要**：问题要基于资料中的具体细节来设计，指向具体的东西（构件、物件、地名、人名、习俗步骤等），不要问抽象的泛泛问题
-8. 所有问题必须口语化，像日常聊天，禁止"请介绍"、"请谈谈"、"有什么文化价值"等书面表达`;
+8. 所有问题必须口语化，像日常聊天，禁止"请介绍"、"请谈谈"、"有什么文化价值"等书面表达
+${requirements ? '9. **必须优先满足用户的具体要求**' : ''}`;
 
     const llmClient = this.getLLMClient();
     const response = await llmClient.invoke(

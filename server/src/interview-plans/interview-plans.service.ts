@@ -5,8 +5,8 @@ import { InterviewPlannerSkill } from '@/skills/interview-planner.skill';
 export class InterviewPlansService {
   constructor(private readonly plannerSkill: InterviewPlannerSkill) {}
 
-  async generate(topicId: string) {
-    return this.plannerSkill.generate(topicId);
+  async generate(topicId: string, subtopicId?: string, requirements?: string) {
+    return this.plannerSkill.generate(topicId, subtopicId, requirements);
   }
 
   async refine(planId: string, feedback: string) {

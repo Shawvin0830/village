@@ -7,8 +7,8 @@ export class InterviewPlansController {
 
   @Post('generate')
   @HttpCode(200)
-  async generate(@Body() body: { topic_id: string }) {
-    const data = await this.plansService.generate(body.topic_id);
+  async generate(@Body() body: { topic_id: string; subtopic_id?: string; requirements?: string }) {
+    const data = await this.plansService.generate(body.topic_id, body.subtopic_id, body.requirements);
     return { code: 200, msg: 'success', data };
   }
 

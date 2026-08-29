@@ -41,6 +41,14 @@ interface InterviewPlan {
   created_at?: string
 }
 
+interface Subtopic {
+  id: string
+  name: string
+  icon?: string
+  transcript_status?: string
+  summary?: string
+}
+
 interface Material {
   id: string
   source: string
@@ -135,12 +143,19 @@ const InterviewPlanPage = () => {
   const [refining, setRefining] = useState(false)
   const [showDiscussion, setShowDiscussion] = useState(false)
 
-  // 加载话题名称、资料列表和已有策划
+  // 生成前对话状态
+  const [showGenerateDialog, setShowGenerateDialog] = useState(false)
+  const [selectedSubtopicId, setSelectedSubtopicId] = useState<string>('')
+  const [generateRequirements, setGenerateRequirements] = useState('')
+  const [subtopics, setSubtopics] = useState<Subtopic[]>([])
+
+  // 加载话题名称、资料列表、已有策划和子话题
   useEffect(() => {
     if (topicId) {
       loadMaterials()
       loadTopicName()
       loadPlans()
+      loadSubtopics()
     }
   }, [topicId])
 
@@ -178,6 +193,18 @@ const InterviewPlanPage = () => {
       }
     } catch (err) {
       console.error('获取采访策划失败:', err)
+    }
+  }
+
+  const loadSubtopics = async () => {
+    try {
+      const res = await Network.request({ url: `/api/topics/${topicId}/subtopics` })
+      const data = res.data?.data
+      if (data && Array.isArray(data)) {
+        setSubtopics(data)
+      }
+    } catch (err) {
+      console.error('获取子话题失败:', err)
     }
   }
 
@@ -400,14 +427,24 @@ const InterviewPlanPage = () => {
   }
 
   const handleGenerate = async () => {
+    // 显示生成前对话弹窗
+    setShowGenerateDialog(true)
+  }
+
+  const handleConfirmGenerate = async () => {
     if (!topicId) return
     try {
       setGenerating(true)
       setLoading(true)
+      setShowGenerateDialog(false)
       const res = await Network.request({
         url: '/api/interview-plans/generate',
         method: 'POST',
-        data: { topic_id: topicId },
+        data: {
+          topic_id: topicId,
+          subtopic_id: selectedSubtopicId || undefined,
+          requirements: generateRequirements.trim() || undefined,
+        },
       })
       console.log('Generate plan response:', res.data)
       const data = res.data?.data
@@ -416,6 +453,9 @@ const InterviewPlanPage = () => {
         // 将新版本添加到版本历史开头
         setPlanVersions(prev => [data, ...prev])
         setShowDiscussion(true)
+        // 重置对话框状态
+        setSelectedSubtopicId('')
+        setGenerateRequirements('')
       }
     } catch (err) {
       console.error('生成采访策划失败:', err)
@@ -1340,6 +1380,112 @@ const InterviewPlanPage = () => {
               </Button>
             </View>
           )}
+        </View>
+      )}
+
+      {/* 生成前对话弹窗 */}
+      {showGenerateDialog && (
+        <View
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => setShowGenerateDialog(false)}
+        >
+          <View
+            className="bg-white rounded-2xl w-11/12 max-h-4/5 overflow-auto"
+            style={{ padding: '20px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Text className="block text-lg font-bold text-stone-800 mb-4">
+              生成采访问题
+            </Text>
+
+            {/* 子话题选择 */}
+            {subtopics.length > 0 && (
+              <View className="mb-4">
+                <Text className="block text-sm font-medium text-stone-700 mb-2">
+                  针对哪个子话题？（可选）
+                </Text>
+                <View className="flex flex-wrap gap-2">
+                  <View
+                    className={`px-3 py-2 rounded-lg border cursor-pointer ${
+                      !selectedSubtopicId
+                        ? 'bg-amber-100 border-amber-400 text-amber-800'
+                        : 'bg-white border-stone-200 text-stone-600'
+                    }`}
+                    onClick={() => setSelectedSubtopicId('')}
+                  >
+                    <Text className="block text-sm">整个话题</Text>
+                  </View>
+                  {subtopics.map((sub) => (
+                    <View
+                      key={sub.id}
+                      className={`px-3 py-2 rounded-lg border cursor-pointer ${
+                        selectedSubtopicId === sub.id
+                          ? 'bg-amber-100 border-amber-400 text-amber-800'
+                          : 'bg-white border-stone-200 text-stone-600'
+                      }`}
+                      onClick={() => setSelectedSubtopicId(sub.id)}
+                    >
+                      <Text className="block text-sm">
+                        {sub.icon || '📌'} {sub.name}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* 具体要求输入 */}
+            <View className="mb-4">
+              <Text className="block text-sm font-medium text-stone-700 mb-2">
+                有什么具体要求？（可选）
+              </Text>
+              <Text className="block text-xs text-stone-400 mb-2">
+                比如：重点关注某个方面、问题风格要更口语化、想问某个特定的人等
+              </Text>
+              <View className="bg-stone-50 rounded-xl" style={{ padding: '12px' }}>
+                <Textarea
+                  style={{ width: '100%', minHeight: '100px', backgroundColor: 'transparent' }}
+                  placeholder="告诉我你想重点问什么，或者有什么特别的要求..."
+                  value={generateRequirements}
+                  onInput={(e) => setGenerateRequirements(e.detail.value)}
+                  maxlength={500}
+                />
+              </View>
+            </View>
+
+            {/* 操作按钮 */}
+            <View style={{ display: 'flex', gap: '12px' }}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowGenerateDialog(false)}
+                >
+                  <Text>取消</Text>
+                </Button>
+              </View>
+              <View style={{ flex: 2 }}>
+                <Button
+                  className="w-full bg-amber-700 hover:bg-amber-800 text-white"
+                  onClick={handleConfirmGenerate}
+                  disabled={generating}
+                >
+                  <Text>{generating ? 'AI 正在思考...' : '开始生成'}</Text>
+                </Button>
+              </View>
+            </View>
+          </View>
         </View>
       )}
     </View>
