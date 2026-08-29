@@ -120,21 +120,29 @@ export class MaterialsController {
       focusAreas: body.focusAreas,
     })
 
-    // 同时保存到资料库（source 标记为 ai_research）
-    const saved = await this.materialsService.create({
-      topicId: body.topicId,
-      source: 'ai_research',
-      title: result.title,
-      content: result.content,
-      tags: result.dimensions,
-      structuredData: {
-        references: result.references,
-        dimensions: result.dimensions,
-        queries: result.queries,
-      } as Record<string, unknown>,
-    })
+    // 尝试保存到资料库（source 标记为 ai_research），失败不阻塞返回
+    let materialId: string | null = null
+    if (body.topicId) {
+      try {
+        const saved = await this.materialsService.create({
+          topicId: body.topicId,
+          source: 'ai_research',
+          title: result.title,
+          content: result.content,
+          tags: result.dimensions,
+          structuredData: {
+            references: result.references,
+            dimensions: result.dimensions,
+            queries: result.queries,
+          } as Record<string, unknown>,
+        })
+        materialId = saved.id
+      } catch {
+        // 保存失败（如话题不存在）不阻塞返回
+      }
+    }
 
-    return { code: 200, msg: 'success', data: { ...result, materialId: saved.id } }
+    return { code: 200, msg: 'success', data: { ...result, materialId } }
   }
 
   /**

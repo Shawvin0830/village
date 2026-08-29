@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Network } from '@/network'
-import { BookOpen, Lightbulb, RefreshCw, Plus, FileText, Trash2, FolderOpen, Search, Globe, Download, ChevronDown, ChevronUp } from 'lucide-react-taro'
+import { BookOpen, Lightbulb, RefreshCw, Plus, FileText, Trash2, FolderOpen, Search, Globe, Download, ChevronDown, ChevronUp, FileSearch, BookOpenCheck, ExternalLink } from 'lucide-react-taro'
 
 interface InterviewPlan {
   id: string
@@ -49,6 +49,22 @@ interface SearchResult {
   materials: SearchMaterial[]
 }
 
+interface ResearchReference {
+  title: string
+  source: string
+  url: string
+  snippet: string
+}
+
+interface ResearchDocument {
+  title: string
+  content: string
+  references: ResearchReference[]
+  dimensions: string[]
+  queries: string[]
+  materialId: string | null
+}
+
 const InterviewPlanPage = () => {
   const router = useRouter()
   const topicId = router.params.topicId || ''
@@ -76,6 +92,12 @@ const InterviewPlanPage = () => {
 
   // 话题名称（用于搜索上下文）
   const [topicName, setTopicName] = useState('')
+
+  // 专题研究状态
+  const [showResearch, setShowResearch] = useState(false)
+  const [researching, setResearching] = useState(false)
+  const [researchDoc, setResearchDoc] = useState<ResearchDocument | null>(null)
+  const [researchFocus, setResearchFocus] = useState('')
 
   // 加载话题名称和资料列表
   useEffect(() => {
@@ -244,6 +266,49 @@ const InterviewPlanPage = () => {
       case 'medium': return 'bg-amber-50 text-amber-700'
       case 'low': return 'bg-stone-100 text-stone-500'
       default: return 'bg-stone-100 text-stone-500'
+    }
+  }
+
+  const handleResearch = async () => {
+    if (!topicId || !topicName) {
+      Taro.showToast({ title: '话题信息不完整', icon: 'none' })
+      return
+    }
+    try {
+      setResearching(true)
+      setResearchDoc(null)
+
+      // 收集子话题名称
+      const subtopicNames = materials.length > 0 ? [] : []
+
+      const focusAreas = researchFocus
+        .split(/[,，、\s]+/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+
+      const res = await Network.request({
+        url: '/api/materials/research',
+        method: 'POST',
+        data: {
+          topicId,
+          topicName,
+          subtopics: subtopicNames.length > 0 ? subtopicNames : undefined,
+          focusAreas: focusAreas.length > 0 ? focusAreas : undefined,
+        },
+      })
+      console.log('Research response:', res.data)
+      const data = res.data?.data
+      if (data) {
+        setResearchDoc(data)
+        if (data.materialId) {
+          loadMaterials()
+        }
+      }
+    } catch (err) {
+      console.error('专题研究失败:', err)
+      Taro.showToast({ title: '研究失败，请重试', icon: 'none' })
+    } finally {
+      setResearching(false)
     }
   }
 
@@ -630,6 +695,155 @@ const InterviewPlanPage = () => {
                         ))}
                       </View>
                     )}
+                  </View>
+                )}
+              </View>
+            )}
+          </CardContent>
+        </Card>
+      </View>
+
+      {/* 专题研究 */}
+      <View className="px-4 mb-4">
+        <Card className="border-stone-100 bg-white">
+          <CardContent className="p-4">
+            <View className="flex items-center justify-between mb-3">
+              <View className="flex items-center gap-2">
+                <FileSearch size={18} color="#B45309" />
+                <Text className="block text-base font-semibold text-stone-800">
+                  AI 专题研究
+                </Text>
+              </View>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowResearch(!showResearch)}
+              >
+                <Text className="text-xs">{showResearch ? '收起' : '开始'}</Text>
+              </Button>
+            </View>
+
+            {showResearch && (
+              <View className="space-y-3">
+                <Text className="block text-xs text-stone-500">
+                  AI 会从多个维度搜索网络权威资料，整理成一篇可读的专题研究文档
+                </Text>
+
+                {/* 关注方向（可选） */}
+                <View>
+                  <Text className="block text-xs text-stone-500 mb-1">
+                    重点关注方向（可选，逗号分隔）
+                  </Text>
+                  <View className="bg-stone-50 rounded-lg px-3 py-2">
+                    <Input
+                      className="w-full bg-transparent"
+                      placeholder="如：建筑特色、方言俗语、宗族制度..."
+                      value={researchFocus}
+                      onInput={(e) => setResearchFocus(e.detail.value)}
+                    />
+                  </View>
+                </View>
+
+                <Button
+                  className="w-full bg-amber-700 hover:bg-amber-800 text-white"
+                  onClick={handleResearch}
+                  disabled={researching}
+                >
+                  <FileSearch size={14} color="#fff" className="mr-1" />
+                  <Text className="text-xs">{researching ? '正在深度研究（约1分钟）...' : '开始专题研究'}</Text>
+                </Button>
+
+                {/* 研究进行中 */}
+                {researching && (
+                  <View className="py-4 flex flex-col items-center">
+                    <Text className="block text-2xl mb-2">🔍</Text>
+                    <Text className="block text-sm text-stone-600 mb-1 text-center">
+                      AI 正在多维度搜索相关资料
+                    </Text>
+                    <Text className="block text-xs text-stone-400 text-center">
+                      搜索网络文献 → 筛选权威来源 → 整理研究文档
+                    </Text>
+                    <View className="mt-3 w-full space-y-2">
+                      <Skeleton className="h-3 w-full" />
+                      <Skeleton className="h-3 w-5/6" />
+                      <Skeleton className="h-3 w-4/6" />
+                    </View>
+                  </View>
+                )}
+
+                {/* 研究文档展示 */}
+                {researchDoc && !researching && (
+                  <View className="space-y-3">
+                    {/* 文档标题 */}
+                    <View className="flex items-center gap-2">
+                      <BookOpenCheck size={16} color="#166534" />
+                      <Text className="block text-sm font-semibold text-stone-800 flex-1">
+                        {researchDoc.title}
+                      </Text>
+                    </View>
+
+                    {/* 覆盖维度 */}
+                    {researchDoc.dimensions.length > 0 && (
+                      <View className="flex flex-wrap gap-1">
+                        {researchDoc.dimensions.map((dim, i) => (
+                          <Badge key={i} className="bg-amber-50 text-amber-700 text-xs">
+                            {dim}
+                          </Badge>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* 文档正文 */}
+                    <View className="p-3 bg-stone-50 rounded-lg">
+                      <Text className="block text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">
+                        {researchDoc.content}
+                      </Text>
+                    </View>
+
+                    {/* 参考资料 */}
+                    {researchDoc.references.length > 0 && (
+                      <View>
+                        <Text className="block text-xs font-medium text-stone-600 mb-2">
+                          参考资料（{researchDoc.references.length} 条）
+                        </Text>
+                        <View className="space-y-1">
+                          {researchDoc.references.slice(0, 5).map((ref, i) => (
+                            <View key={i} className="p-2 bg-white rounded border border-stone-100">
+                              <Text className="block text-xs font-medium text-stone-700">
+                                {ref.title}
+                              </Text>
+                              <View className="flex items-center gap-1 mt-1">
+                                <Text className="block text-xs text-stone-400">
+                                  {ref.source}
+                                </Text>
+                                {ref.url && (
+                                  <ExternalLink size={10} color="#9CA3AF" />
+                                )}
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* 操作按钮 */}
+                    <View className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 border-stone-200"
+                        onClick={handleResearch}
+                        disabled={researching}
+                      >
+                        <RefreshCw size={12} color="#B45309" className="mr-1" />
+                        <Text className="text-xs">重新研究</Text>
+                      </Button>
+                      {researchDoc.materialId && (
+                        <Badge className="bg-green-50 text-green-700 text-xs">
+                          已保存到资料库
+                        </Badge>
+                      )}
+                    </View>
                   </View>
                 )}
               </View>

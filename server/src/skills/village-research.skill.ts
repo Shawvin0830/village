@@ -39,29 +39,11 @@ interface ResearchParams {
   focusAreas?: string[];
 }
 
-/** 权威来源白名单 */
-const AUTHORITATIVE_SITES = [
-  // 政府文化部门
-  'gov.cn',
-  'mhfl.gov.cn',
-  'nrcta.gov.cn',
-  // 文化遗产
-  'ihchina.cn',
-  'whycw.com',
-  // 学术/百科
-  'cnki.net',
-  'wikipedia.org',
-  'baike.baidu.com',
-  // 博物馆/文化机构
-  'nmchina.cn',
-  'dpm.org.cn',
-  // 地方志/方志
-  'difangzhi.cn',
-  // 传统文化促进
-  'tcpc.org.cn',
-  // 学术搜索
-  'xueshu.baidu.com',
-].join(',');
+/**
+ * 权威来源偏好关键词（用于 LLM 筛选，而非硬限制搜索站点）
+ * 硬限制 sites 会导致搜索结果过少，改为在 LLM 整理时优先引用权威来源
+ */
+const AUTHORITY_KEYWORDS = '政府、博物馆、大学、研究院、地方志、文化遗产、非遗、文物局';
 
 @Injectable()
 export class VillageResearchSkill {
@@ -117,10 +99,9 @@ export class VillageResearchSkill {
     const searchPromises = queries.map((query) =>
       searchClient
         .advancedSearch(query, {
-          count: 5,
+          count: 6,
           needContent: true,
           needUrl: true,
-          sites: AUTHORITATIVE_SITES,
           needSummary: true,
         })
         .catch((err) => {
@@ -300,7 +281,8 @@ export class VillageResearchSkill {
 3. **引用标注**：在引用具体事实时，用 [来源名称] 标注出处
 4. **去伪存真**：如果不同来源的信息有矛盾，指出来，不要随意取舍
 5. **贴近村庄**：始终围绕"村庄"这个尺度，不要写成泛泛的文化概述
-6. **篇幅控制**：1500-3000 字，信息密度要高，不要水字数
+6. **来源优先**：优先引用政府网站、学术机构、博物馆、地方志等权威来源（${AUTHORITY_KEYWORDS}），对来源不明的信息要标注"待核实"
+7. **篇幅控制**：1500-3000 字，信息密度要高，不要水字数
 
 ## 格式要求
 
