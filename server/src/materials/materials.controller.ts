@@ -1,9 +1,13 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, HttpCode } from '@nestjs/common'
 import { MaterialsService } from './materials.service'
+import { MaterialSearchSkill } from '@/skills/material-search.skill'
 
 @Controller('materials')
 export class MaterialsController {
-  constructor(private readonly materialsService: MaterialsService) {}
+  constructor(
+    private readonly materialsService: MaterialsService,
+    private readonly materialSearchSkill: MaterialSearchSkill,
+  ) {}
 
   /**
    * 获取话题下的所有资料
@@ -73,6 +77,22 @@ export class MaterialsController {
   @HttpCode(200)
   async delete(@Param('id') id: string) {
     const result = await this.materialsService.delete(id)
+    return { code: 200, msg: 'success', data: result }
+  }
+
+  /**
+   * AI 搜索网络资料并整理成结构化文档
+   */
+  @Post('search')
+  @HttpCode(200)
+  async searchMaterials(@Body() body: { query: string; topicName?: string }) {
+    if (!body.query?.trim()) {
+      return { code: 400, msg: '请输入搜索关键词', data: null }
+    }
+    const result = await this.materialSearchSkill.searchAndStructure(
+      body.query.trim(),
+      body.topicName?.trim(),
+    )
     return { code: 200, msg: 'success', data: result }
   }
 

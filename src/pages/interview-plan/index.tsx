@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Network } from '@/network'
-import { BookOpen, Lightbulb, RefreshCw, Plus, FileText, Trash2, FolderOpen } from 'lucide-react-taro'
+import { BookOpen, Lightbulb, RefreshCw, Plus, FileText, Trash2, FolderOpen, Search, Globe, Download, ChevronDown, ChevronUp } from 'lucide-react-taro'
 
 interface InterviewPlan {
   id: string
@@ -28,6 +28,27 @@ interface Material {
   created_at: string
 }
 
+interface StructuredData {
+  summary: string
+  keyFacts: string[]
+  relatedEntities: string[]
+  credibility: 'high' | 'medium' | 'low'
+}
+
+interface SearchMaterial {
+  title: string
+  content: string
+  source: string
+  url: string
+  tags: string[]
+  structuredData: StructuredData
+}
+
+interface SearchResult {
+  searchSummary: string
+  materials: SearchMaterial[]
+}
+
 const InterviewPlanPage = () => {
   const router = useRouter()
   const topicId = router.params.topicId || ''
@@ -45,12 +66,36 @@ const InterviewPlanPage = () => {
   const [newMaterialTags, setNewMaterialTags] = useState('')
   const [addingMaterial, setAddingMaterial] = useState(false)
 
-  // 加载资料列表
+  // AI 搜索状态
+  const [showAISearch, setShowAISearch] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searching, setSearching] = useState(false)
+  const [searchResult, setSearchResult] = useState<SearchResult | null>(null)
+  const [expandedCard, setExpandedCard] = useState<number | null>(null)
+  const [savingIndex, setSavingIndex] = useState<number | null>(null)
+
+  // 话题名称（用于搜索上下文）
+  const [topicName, setTopicName] = useState('')
+
+  // 加载话题名称和资料列表
   useEffect(() => {
     if (topicId) {
       loadMaterials()
+      loadTopicName()
     }
   }, [topicId])
+
+  const loadTopicName = async () => {
+    try {
+      const res = await Network.request({ url: `/api/topics/${topicId}` })
+      const data = res.data?.data
+      if (data?.name) {
+        setTopicName(data.name)
+      }
+    } catch (err) {
+      console.error('获取话题名称失败:', err)
+    }
+  }
 
   const loadMaterials = async () => {
     try {
@@ -126,6 +171,79 @@ const InterviewPlanPage = () => {
       }
     } catch (err) {
       console.error('删除资料失败:', err)
+    }
+  }
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      Taro.showToast({ title: '请输入搜索关键词', icon: 'none' })
+      return
+    }
+    try {
+      setSearching(true)
+      setSearchResult(null)
+      const res = await Network.request({
+        url: '/api/materials/search',
+        method: 'POST',
+        data: { query: searchQuery.trim(), topicName },
+      })
+      console.log('AI search response:', res.data)
+      const data = res.data?.data
+      if (data) {
+        setSearchResult(data)
+      }
+    } catch (err) {
+      console.error('AI 搜索失败:', err)
+      Taro.showToast({ title: '搜索失败，请重试', icon: 'none' })
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const handleSaveMaterial = async (material: SearchMaterial, index: number) => {
+    try {
+      setSavingIndex(index)
+      const res = await Network.request({
+        url: '/api/materials',
+        method: 'POST',
+        data: {
+          topicId,
+          source: 'ai_search',
+          title: material.title,
+          content: material.content,
+          url: material.url || null,
+          tags: material.tags,
+          structuredData: material.structuredData,
+        },
+      })
+      console.log('Save material response:', res.data)
+      if (res.data?.code === 200) {
+        Taro.showToast({ title: '已保存到资料库', icon: 'success' })
+        loadMaterials()
+      }
+    } catch (err) {
+      console.error('保存资料失败:', err)
+      Taro.showToast({ title: '保存失败，请重试', icon: 'none' })
+    } finally {
+      setSavingIndex(null)
+    }
+  }
+
+  const getCredibilityLabel = (credibility: string) => {
+    switch (credibility) {
+      case 'high': return '权威'
+      case 'medium': return '一般'
+      case 'low': return '待验证'
+      default: return credibility
+    }
+  }
+
+  const getCredibilityColor = (credibility: string) => {
+    switch (credibility) {
+      case 'high': return 'bg-green-50 text-green-700'
+      case 'medium': return 'bg-amber-50 text-amber-700'
+      case 'low': return 'bg-stone-100 text-stone-500'
+      default: return 'bg-stone-100 text-stone-500'
     }
   }
 
@@ -336,6 +454,184 @@ const InterviewPlanPage = () => {
                     )}
                   </View>
                 ))}
+              </View>
+            )}
+          </CardContent>
+        </Card>
+      </View>
+
+      {/* AI 搜索 */}
+      <View className="px-4 mb-4">
+        <Card className="border-stone-100 bg-white">
+          <CardContent className="p-4">
+            <View className="flex items-center justify-between mb-3">
+              <View className="flex items-center gap-2">
+                <Globe size={18} color="#4D7C0F" />
+                <Text className="block text-base font-semibold text-stone-800">
+                  AI 资料搜索
+                </Text>
+              </View>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAISearch(!showAISearch)}
+              >
+                <Search size={14} color="#4D7C0F" className="mr-1" />
+                <Text className="text-xs">{showAISearch ? '收起' : '搜索'}</Text>
+              </Button>
+            </View>
+
+            {showAISearch && (
+              <View className="space-y-3">
+                {/* 搜索输入 */}
+                <View>
+                  <Text className="block text-xs text-stone-500 mb-1">
+                    输入关键词，AI 帮你搜索网络文献并整理成结构化资料
+                  </Text>
+                  <View className="bg-stone-50 rounded-lg px-3 py-2">
+                    <Input
+                      className="w-full bg-transparent"
+                      placeholder="如：祠堂建筑历史、XX村民俗、传统木雕工艺..."
+                      value={searchQuery}
+                      onInput={(e) => setSearchQuery(e.detail.value)}
+                      onConfirm={handleSearch}
+                    />
+                  </View>
+                </View>
+                <Button
+                  className="w-full bg-lime-800 hover:bg-lime-900 text-white"
+                  size="sm"
+                  onClick={handleSearch}
+                  disabled={searching}
+                >
+                  <Search size={14} color="#fff" className="mr-1" />
+                  <Text className="text-xs">{searching ? '搜索整理中...' : '搜索并整理资料'}</Text>
+                </Button>
+
+                {/* 搜索结果 */}
+                {searchResult && (
+                  <View className="space-y-3">
+                    {/* 搜索摘要 */}
+                    <View className="p-3 bg-lime-50 rounded-lg">
+                      <Text className="block text-xs font-medium text-lime-800 mb-1">
+                        AI 整理摘要
+                      </Text>
+                      <Text className="block text-xs text-stone-600 leading-relaxed">
+                        {searchResult.searchSummary}
+                      </Text>
+                    </View>
+
+                    {searchResult.materials.length === 0 ? (
+                      <View className="py-4 text-center">
+                        <Text className="block text-sm text-stone-500">
+                          未找到相关资料，请尝试其他关键词
+                        </Text>
+                      </View>
+                    ) : (
+                      <View className="space-y-2">
+                        <Text className="block text-xs text-stone-500">
+                          找到 {searchResult.materials.length} 条结构化资料，点击可保存到资料库
+                        </Text>
+                        {searchResult.materials.map((m, i) => (
+                          <View key={i} className="p-3 bg-stone-50 rounded-lg">
+                            {/* 标题行 */}
+                            <View
+                              className="flex items-start justify-between"
+                              onClick={() => setExpandedCard(expandedCard === i ? null : i)}
+                            >
+                              <View className="flex items-start gap-2 flex-1">
+                                <FileText size={14} color="#4D7C0F" />
+                                <View className="flex-1">
+                                  <Text className="block text-sm font-medium text-stone-800">
+                                    {m.title}
+                                  </Text>
+                                  <View className="flex items-center gap-1 mt-1">
+                                    <Text className="block text-xs text-stone-400">
+                                      {m.source}
+                                    </Text>
+                                    <Badge className={`text-xs ${getCredibilityColor(m.structuredData.credibility)}`}>
+                                      {getCredibilityLabel(m.structuredData.credibility)}
+                                    </Badge>
+                                  </View>
+                                </View>
+                              </View>
+                              {expandedCard === i ? (
+                                <ChevronUp size={16} color="#78716C" />
+                              ) : (
+                                <ChevronDown size={16} color="#78716C" />
+                              )}
+                            </View>
+
+                            {/* 一句话摘要 */}
+                            {m.structuredData.summary && (
+                              <Text className="block text-xs text-stone-500 mt-2 ml-5 italic">
+                                {m.structuredData.summary}
+                              </Text>
+                            )}
+
+                            {/* 展开详情 */}
+                            {expandedCard === i && (
+                              <View className="mt-3 ml-5 space-y-2">
+                                {/* 正文 */}
+                                <Text className="block text-xs text-stone-600 leading-relaxed">
+                                  {m.content}
+                                </Text>
+
+                                {/* 关键事实 */}
+                                {m.structuredData.keyFacts.length > 0 && (
+                                  <View>
+                                    <Text className="block text-xs font-medium text-stone-700 mb-1">
+                                      关键信息
+                                    </Text>
+                                    {m.structuredData.keyFacts.map((fact, fi) => (
+                                      <Text key={fi} className="block text-xs text-stone-500">
+                                        · {fact}
+                                      </Text>
+                                    ))}
+                                  </View>
+                                )}
+
+                                {/* 标签 */}
+                                {m.tags.length > 0 && (
+                                  <View className="flex flex-wrap gap-1">
+                                    {m.tags.map((tag, ti) => (
+                                      <Badge key={ti} className="bg-stone-200 text-stone-600 text-xs">
+                                        {tag}
+                                      </Badge>
+                                    ))}
+                                  </View>
+                                )}
+
+                                {/* 相关链接 */}
+                                {m.url && (
+                                  <Text className="block text-xs text-blue-600">
+                                    来源: {m.url}
+                                  </Text>
+                                )}
+                              </View>
+                            )}
+
+                            {/* 保存按钮 */}
+                            <View className="mt-2 ml-5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-lime-300 text-lime-800"
+                                onClick={() => handleSaveMaterial(m, i)}
+                                disabled={savingIndex === i}
+                              >
+                                <Download size={12} color="#4D7C0F" className="mr-1" />
+                                <Text className="text-xs">
+                                  {savingIndex === i ? '保存中...' : '保存到资料库'}
+                                </Text>
+                              </Button>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                )}
               </View>
             )}
           </CardContent>
