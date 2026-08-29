@@ -165,25 +165,24 @@ export default defineConfig<'vite'>(async (merge, _env) => {
                 closeBundle() {
                   const srcDir = path.resolve(__dirname, '../src/static');
                   const destDir = path.resolve(__dirname, '..', outputRoot, 'static');
-                  if (fs.existsSync(srcDir)) {
-                    // Copy manifest.json
-                    const manifestSrc = path.join(srcDir, 'manifest.json');
-                    const manifestDest = path.join(destDir, 'manifest.json');
-                    if (fs.existsSync(manifestSrc)) {
-                      fs.mkdirSync(path.dirname(manifestDest), { recursive: true });
-                      fs.copyFileSync(manifestSrc, manifestDest);
-                    }
-                    // Copy icons directory
-                    const iconsSrc = path.join(srcDir, 'icons');
-                    const iconsDest = path.join(destDir, 'icons');
-                    if (fs.existsSync(iconsSrc)) {
-                      fs.mkdirSync(iconsDest, { recursive: true });
-                      fs.readdirSync(iconsSrc).forEach((file) => {
-                        fs.copyFileSync(path.join(iconsSrc, file), path.join(iconsDest, file));
-                      });
-                    }
-                    console.log('PWA assets copied to', destDir);
+                  if (!fs.existsSync(srcDir)) return;
+                  // Copy manifest.json
+                  const manifestSrc = path.join(srcDir, 'manifest.json');
+                  const manifestDest = path.join(destDir, 'manifest.json');
+                  if (fs.existsSync(manifestSrc)) {
+                    fs.mkdirSync(path.dirname(manifestDest), { recursive: true });
+                    fs.copyFileSync(manifestSrc, manifestDest);
                   }
+                  // Copy icons directory
+                  const iconsSrc = path.join(srcDir, 'icons');
+                  const iconsDest = path.join(destDir, 'icons');
+                  if (fs.existsSync(iconsSrc)) {
+                    fs.mkdirSync(iconsDest, { recursive: true });
+                    fs.readdirSync(iconsSrc).forEach((file) => {
+                      fs.copyFileSync(path.join(iconsSrc, file), path.join(iconsDest, file));
+                    });
+                  }
+                  console.log('PWA assets copied to', destDir);
                 },
               },
             ]
