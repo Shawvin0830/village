@@ -1,66 +1,51 @@
 import { Injectable } from '@nestjs/common';
 import { TranscriptOrganizerSkill } from '@/skills/transcript-organizer.skill';
+import { OperatorsService, type OperatorHeaders } from '@/operators/operators.service';
 
 @Injectable()
 export class InterviewRecordsService {
-  constructor(private readonly organizerSkill: TranscriptOrganizerSkill) {}
+  constructor(
+    private readonly organizerSkill: TranscriptOrganizerSkill,
+    private readonly operatorsService: OperatorsService,
+  ) {}
 
-  async uploadAudio(file: Express.Multer.File) {
+  async uploadAudio(file: Express.Multer.File, headers?: OperatorHeaders) {
+    const operator = await this.operatorsService.require(headers || {});
+    this.operatorsService.assertCan(operator, 'create_interview_record');
     return this.organizerSkill.uploadAudio(file);
   }
 
-  async transcribe(topicId: string, audioKey: string, subtopicId?: string, intervieweeName?: string) {
-    return this.organizerSkill.transcribe(topicId, audioKey, subtopicId, intervieweeName);
+  async transcribe(topicId: string, audioKey: string, subtopicId?: string, headers?: OperatorHeaders) {
+    const operator = await this.operatorsService.require(headers || {});
+    this.operatorsService.assertCan(operator, 'create_interview_record');
+    const result = await this.organizerSkill.transcribe(topicId, audioKey, subtopicId, operator);
+    await this.operatorsService.writeLog({
+      operator,
+      actionType: 'create_interview_record',
+      targetType: 'interview_record',
+      targetId: result.record_id || null,
+      targetName: '采访整理',
+      summary: `${operator.display_name} 整理了一条采访记录`,
+    });
+    return result;
   }
 
-  async transcribeText(topicId: string, text: string, subtopicId?: string, intervieweeName?: string) {
-    return this.organizerSkill.transcribeText(topicId, text, subtopicId, intervieweeName);
+  async transcribeText(topicId: string, text: string, subtopicId?: string, headers?: OperatorHeaders) {
+    const operator = await this.operatorsService.require(headers || {});
+    this.operatorsService.assertCan(operator, 'create_interview_record');
+    const result = await this.organizerSkill.transcribeText(topicId, text, subtopicId, operator);
+    await this.operatorsService.writeLog({
+      operator,
+      actionType: 'create_interview_record',
+      targetType: 'interview_record',
+      targetId: result.record_id || null,
+      targetName: '采访整理',
+      summary: `${operator.display_name} 录入并整理了一条采访文本`,
+    });
+    return result;
   }
 
   async getByTopic(topicId: string) {
     return this.organizerSkill.getByTopic(topicId);
-  }
-
-  /** v3 新增：获取话题下所有故事线的最新导览叙事 */
-  async getStoryMap(topicId: string) {
-    return this.organizerSkill.getStoryMap(topicId);
-  }
-
-  /** v3 新增：一步从文本到故事档案馆（整理 + 存库 + 汇总 + 渲染 HTML + 上传） */
-  async transcribeTextToArchive(
-    topicId: string,
-    text: string,
-    subtopicId?: string,
-    meta?: { title?: string; subtitle?: string; note?: string },
-  ) {
-    return this.organizerSkill.transcribeTextToArchive(topicId, text, subtopicId, meta);
-  }
-
-  /** v3 新增：渲染某话题已积累的全部采访为故事档案馆 HTML */
-  async renderTopicArchive(
-    topicId: string,
-    meta?: { title?: string; subtitle?: string; note?: string },
-  ) {
-    return this.organizerSkill.renderTopicArchive(topicId, meta);
-  }
-
-  /** 确认采访记录（归入资料库） */
-  async confirmRecord(recordId: string, editedText?: string, subtopicId?: string) {
-    return this.organizerSkill.confirmRecord(recordId, editedText, subtopicId);
-  }
-
-  /** 驳回采访记录 */
-  async rejectRecord(recordId: string) {
-    return this.organizerSkill.rejectRecord(recordId);
-  }
-
-  /** 文档上传 + 解析 + 整理 */
-  async uploadAndParseDocument(
-    file: Express.Multer.File,
-    topicId: string,
-    subtopicId?: string,
-    intervieweeName?: string,
-  ) {
-    return this.organizerSkill.uploadAndParseDocument(file, topicId, subtopicId, intervieweeName);
   }
 }

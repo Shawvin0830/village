@@ -12,11 +12,9 @@ import {
   BookOpen,
   ChevronRight,
   FileText,
-  Pencil,
   Quote,
   ShieldCheck,
   UserRound,
-  ExternalLink,
 } from 'lucide-react-taro'
 
 interface TopicAffiliation {
@@ -41,6 +39,8 @@ interface QuoteItem {
   quote: string
   summary: string
   full_interview: string
+  created_by_name?: string | null
+  updated_by_name?: string | null
   created_at?: string | null
   interviewee: IntervieweeProfile
 }
@@ -53,6 +53,8 @@ interface ReferenceItem {
   tags?: string[]
   summary: string
   content: string
+  created_by_name?: string | null
+  updated_by_name?: string | null
   created_at?: string | null
 }
 
@@ -67,7 +69,6 @@ interface SubtopicMaterialsData {
     transcript_status?: string | null
     verify_status?: string | null
   }
-  essence_summary?: string | null
   quotes: QuoteItem[]
   references: ReferenceItem[]
 }
@@ -95,7 +96,10 @@ const affiliationText = (items?: TopicAffiliation[]) => {
   return items.map((item) => `${item.primary}-${item.secondary}`).join('、')
 }
 
-type ViewMode = 'main' | 'interviews' | 'references' | 'profile'
+const normalizeTags = (tags?: string[]) => {
+  if (!Array.isArray(tags)) return []
+  return tags.map((item) => String(item)).filter(Boolean)
+}
 
 const SubtopicMaterialsPage = () => {
   const router = useRouter()
@@ -104,7 +108,6 @@ const SubtopicMaterialsPage = () => {
 
   const [data, setData] = useState<SubtopicMaterialsData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<ViewMode>('main')
   const [selectedQuote, setSelectedQuote] = useState<QuoteItem | null>(null)
 
   const fetchMaterials = useCallback(async () => {
@@ -128,15 +131,6 @@ const SubtopicMaterialsPage = () => {
     fetchMaterials()
   })
 
-  const goBack = () => {
-    if (view === 'profile') {
-      setView('interviews')
-      setSelectedQuote(null)
-    } else {
-      setView('main')
-    }
-  }
-
   if (loading) {
     return (
       <View className="min-h-screen bg-stone-50 px-4 pt-6">
@@ -158,17 +152,21 @@ const SubtopicMaterialsPage = () => {
     )
   }
 
-  // ---- 受访人档案详情 ----
-  if (view === 'profile' && selectedQuote) {
-    const person = selectedQuote.interviewee
+  const renderProfile = (quote: QuoteItem) => {
+    const person = quote.interviewee
     const status = authInfo(person.auth_status)
 
     return (
       <View className="min-h-screen bg-stone-50 pb-8">
         <View className="px-4 pt-6 pb-4">
-          <Button size="sm" variant="ghost" className="mb-3" onClick={goBack}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="mb-3"
+            onClick={() => setSelectedQuote(null)}
+          >
             <ArrowLeft size={16} color="#57534E" className="mr-1" />
-            <Text>返回采访记录</Text>
+            <Text>返回摘录</Text>
           </Button>
           <Text className="block text-xl font-bold text-stone-800">受访人档案</Text>
           <Text className="block text-sm text-stone-500 mt-1">
@@ -227,11 +225,14 @@ const SubtopicMaterialsPage = () => {
               </View>
               <View className="bg-amber-50 rounded-lg p-4 border border-amber-100 mb-3">
                 <Text className="block text-sm text-amber-900 leading-relaxed">
-                  &ldquo;{selectedQuote.quote}&rdquo;
+                  “{quote.quote}”
                 </Text>
               </View>
               <Text className="block text-xs text-stone-500">
-                来源：采访整理文档 / {compactDate(selectedQuote.created_at)}
+                来源：采访整理文档 / {compactDate(quote.created_at)}
+              </Text>
+              <Text className="block text-xs text-stone-400 mt-1">
+                整理人：{quote.updated_by_name || quote.created_by_name || '待补充'}
               </Text>
             </CardContent>
           </Card>
@@ -245,7 +246,7 @@ const SubtopicMaterialsPage = () => {
                 </Text>
               </View>
               <Text className="block text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">
-                {selectedQuote.full_interview}
+                {quote.full_interview}
               </Text>
             </CardContent>
           </Card>
@@ -254,317 +255,168 @@ const SubtopicMaterialsPage = () => {
     )
   }
 
-  // ---- 历史采访沉淀列表 ----
-  if (view === 'interviews') {
-    return (
-      <View className="min-h-screen bg-stone-50 pb-8">
-        <View className="px-4 pt-6 pb-2">
-          <Button size="sm" variant="ghost" className="mb-3" onClick={goBack}>
-            <ArrowLeft size={16} color="#57534E" className="mr-1" />
-            <Text>返回子话题</Text>
-          </Button>
-          <View className="flex items-center mb-2">
-            <Quote size={20} color="#B45309" className="mr-2" />
-            <Text className="block text-xl font-bold text-stone-800">历史采访沉淀</Text>
-          </View>
-          <Text className="block text-sm text-stone-500">
-            {data.topic_name} / {data.subtopic.name}
+  if (selectedQuote) {
+    return renderProfile(selectedQuote)
+  }
+
+  return (
+    <View className="min-h-screen bg-stone-50 pb-8">
+      <View className="px-4 pt-6 pb-4">
+        <Text className="block text-xl font-bold text-stone-800">
+          {data.subtopic.icon || '📌'} {data.subtopic.name}
+        </Text>
+        <Text className="block text-sm text-stone-500 mt-1">
+          {data.topic_name}
+        </Text>
+        {data.subtopic.summary && (
+          <Text className="block text-sm text-stone-600 leading-relaxed mt-3">
+            {data.subtopic.summary}
+          </Text>
+        )}
+      </View>
+
+      <View className="px-4 mb-4">
+        <View className="grid grid-cols-2 gap-3">
+          <Card className="border-stone-100 bg-white">
+            <CardContent className="p-3">
+              <Text className="block text-lg font-bold text-stone-800">{data.quotes.length}</Text>
+              <Text className="block text-xs text-stone-500">历史采访摘录</Text>
+            </CardContent>
+          </Card>
+          <Card className="border-stone-100 bg-white">
+            <CardContent className="p-3">
+              <Text className="block text-lg font-bold text-stone-800">{data.references.length}</Text>
+              <Text className="block text-xs text-stone-500">外部文献</Text>
+            </CardContent>
+          </Card>
+        </View>
+      </View>
+
+      <View className="px-4 mb-5">
+        <View className="flex items-center mb-3">
+          <FileText size={18} color="#92400E" className="mr-2" />
+          <Text className="block text-base font-semibold text-stone-800">
+            谁讲过这段
           </Text>
         </View>
 
-        {/* 采访精华摘要 */}
-        {(data.essence_summary || data.subtopic.summary) && (
-          <View className="px-4 mb-4">
-            <Card className="border-amber-100 bg-amber-50">
-              <CardContent className="p-4">
-                <View className="flex items-center mb-2">
-                  <FileText size={16} color="#92400E" className="mr-2" />
-                  <Text className="block text-sm font-semibold text-amber-900">
-                    内容精华
-                  </Text>
-                </View>
-                <Text className="block text-sm text-stone-700 leading-relaxed">
-                  {data.essence_summary || data.subtopic.summary}
-                </Text>
-              </CardContent>
-            </Card>
-          </View>
-        )}
-
-        {/* 采访记录列表 */}
-        <View className="px-4">
-          <Text className="block text-base font-semibold text-stone-800 mb-3">
-            采访记录（{data.quotes.length}）
-          </Text>
-
-          {data.quotes.length === 0 ? (
-            <Card className="border-stone-100 bg-white">
-              <CardContent className="p-6">
-                <Text className="block text-sm text-stone-500 text-center">
-                  还没有关联到这个子话题的历史采访
-                </Text>
-              </CardContent>
-            </Card>
-          ) : (
-            <View className="space-y-3">
-              {data.quotes.map((item) => (
+        {data.quotes.length === 0 ? (
+          <Card className="border-stone-100 bg-white">
+            <CardContent className="p-6">
+              <Text className="block text-sm text-stone-500 text-center">
+                还没有关联到这个子话题的历史采访
+              </Text>
+            </CardContent>
+          </Card>
+        ) : (
+          <View className="space-y-3">
+            {data.quotes.map((item) => {
+              const status = authInfo(item.interviewee.auth_status)
+              return (
                 <Card
                   key={item.id}
                   className="border-stone-100 bg-white shadow-sm"
-                  onClick={() => {
-                    setSelectedQuote(item)
-                    setView('profile')
-                  }}
+                  onClick={() => setSelectedQuote(item)}
                 >
                   <CardContent className="p-4">
-                    {/* 时间 + 采访人 */}
-                    <View className="flex items-center justify-between mb-3">
+                    <View className="flex items-start justify-between mb-3">
                       <View className="flex items-center flex-1">
-                        <View className="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center mr-2">
-                          <UserRound size={18} color="#92400E" />
+                        <View className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center mr-3">
+                          <UserRound size={20} color="#92400E" />
                         </View>
                         <View className="flex-1">
                           <Text className="block text-sm font-semibold text-stone-800">
                             {item.interviewee.name}
                           </Text>
-                          <Text className="block text-xs text-stone-500">
-                            {compactDate(item.created_at)}
+                          <Text className="block text-xs text-stone-500 mt-1">
+                            {formatProfileLine(item.interviewee)}
                           </Text>
                         </View>
                       </View>
-                      <ChevronRight size={16} color="#A8A29E" />
+                      <Badge className={status.color}>
+                        <Text className="text-xs">{status.label}</Text>
+                      </Badge>
                     </View>
 
-                    <Separator className="mb-3" />
-
-                    {/* 结构化文档（摘录精华） */}
-                    <View className="mb-3">
-                      <View className="flex items-center justify-between mb-2">
-                        <Text className="block text-xs text-stone-500">采访摘录</Text>
-                        <View
-                          className="flex items-center"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            Taro.navigateTo({
-                              url: `/pages/interview-manage/index?topicId=${topicId}&subtopicId=${subtopicId}&subName=${encodeURIComponent(data.subtopic.name)}&editId=${item.id}`,
-                            })
-                          }}
-                        >
-                          <Pencil size={12} color="#B45309" className="mr-1" />
-                          <Text className="text-xs text-amber-700">编辑</Text>
-                        </View>
-                      </View>
-                      <View className="bg-amber-50 rounded-lg p-3 border border-amber-100">
-                        <Text className="block text-sm text-amber-900 leading-relaxed">
-                          &ldquo;{item.quote}&rdquo;
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* 采访原始文本 */}
-                    <View className="mb-3">
-                      <Text className="block text-xs text-stone-500 mb-2">原始文本</Text>
-                      <Text className="block text-sm text-stone-600 leading-relaxed line-clamp-3 whitespace-pre-wrap">
-                        {item.full_interview}
+                    <View className="bg-amber-50 rounded-lg p-3 border border-amber-100 mb-3">
+                      <Text className="block text-sm text-amber-900 leading-relaxed">
+                        “{item.quote}”
                       </Text>
                     </View>
 
-                    {/* 编辑按钮 */}
-                    <View className="flex justify-end">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-stone-200"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          Taro.navigateTo({
-                            url: `/pages/interview-manage/index?topicId=${topicId}&subtopicId=${subtopicId}&subName=${encodeURIComponent(data.subtopic.name)}&editId=${item.id}`,
-                          })
-                        }}
-                      >
-                        <Pencil size={14} color="#B45309" className="mr-1" />
-                        <Text className="text-xs text-amber-700">编辑</Text>
-                      </Button>
-                    </View>
-                  </CardContent>
-                </Card>
-              ))}
-            </View>
-          )}
-        </View>
-      </View>
-    )
-  }
-
-  // ---- 外部文献列表 ----
-  if (view === 'references') {
-    return (
-      <View className="min-h-screen bg-stone-50 pb-8">
-        <View className="px-4 pt-6 pb-2">
-          <Button size="sm" variant="ghost" className="mb-3" onClick={goBack}>
-            <ArrowLeft size={16} color="#57534E" className="mr-1" />
-            <Text>返回子话题</Text>
-          </Button>
-          <View className="flex items-center mb-2">
-            <BookOpen size={20} color="#1D4ED8" className="mr-2" />
-            <Text className="block text-xl font-bold text-stone-800">外部文献</Text>
-          </View>
-          <Text className="block text-sm text-stone-500">
-            {data.topic_name} / {data.subtopic.name}
-          </Text>
-        </View>
-
-        <View className="px-4">
-          <Text className="block text-base font-semibold text-stone-800 mb-3">
-            文献资料（{data.references.length}）
-          </Text>
-
-          {data.references.length === 0 ? (
-            <Card className="border-stone-100 bg-white">
-              <CardContent className="p-6">
-                <Text className="block text-sm text-stone-500 text-center">
-                  还没有关联到这个子话题的外部文献
-                </Text>
-              </CardContent>
-            </Card>
-          ) : (
-            <View className="space-y-3">
-              {data.references.map((item) => (
-                <Card key={item.id} className="border-stone-100 bg-white shadow-sm">
-                  <CardContent className="p-4">
-                    {/* 摘录内容 */}
-                    <View className="mb-3">
-                      <Text className="block text-xs text-stone-500 mb-2">摘录</Text>
-                      <View className="bg-blue-50 rounded-lg p-3 border border-blue-100">
-                        <Text className="block text-sm text-blue-900 leading-relaxed">
-                          {item.summary || item.content}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* 原文 */}
-                    <View className="mb-3">
-                      <Text className="block text-xs text-stone-500 mb-2">原文</Text>
-                      <Text className="block text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">
-                        {item.content}
+                    <View className="flex items-center justify-between">
+                      <Text className="text-xs text-stone-500">
+                        整理人：{item.updated_by_name || item.created_by_name || '待补充'}
                       </Text>
-                    </View>
-
-                    {/* 原文链接 */}
-                    {item.url && (
-                      <View
-                        className="flex items-center mt-2"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (item.url) {
-                            Taro.setClipboardData({
-                              data: item.url,
-                              success: () => {
-                                Taro.showToast({ title: '链接已复制', icon: 'success' })
-                              },
-                            })
-                          }
-                        }}
-                      >
-                        <ExternalLink size={14} color="#1D4ED8" className="mr-1" />
-                        <Text className="text-sm text-blue-600">
-                          {item.source || '查看原文来源'}
-                        </Text>
+                      <View className="flex items-center ml-2">
+                        <Text className="text-xs text-amber-700">查看档案</Text>
+                        <ChevronRight size={14} color="#B45309" />
                       </View>
-                    )}
-
-                    <Text className="block text-xs text-stone-400 mt-2">
-                      {item.source || '来源待补充'} · {compactDate(item.created_at)}
+                    </View>
+                    <Text className="block text-xs text-stone-500 mt-2 line-clamp-2">
+                      {item.summary || '摘要待补充'}
                     </Text>
                   </CardContent>
                 </Card>
-              ))}
-            </View>
-          )}
+              )
+            })}
+          </View>
+        )}
+      </View>
+
+      <View className="px-4">
+        <View className="flex items-center mb-3">
+          <BookOpen size={18} color="#1D4ED8" className="mr-2" />
+          <Text className="block text-base font-semibold text-stone-800">
+            外部文献
+          </Text>
         </View>
-      </View>
-    )
-  }
 
-  // ---- 主视图：精华摘要 + 两个入口卡片 ----
-  return (
-    <View className="min-h-screen bg-stone-50 pb-8">
-      {/* 子话题标题 */}
-      <View className="px-4 pt-6 pb-3">
-        <Text className="block text-xl font-bold text-stone-800">
-          {data.subtopic.icon || '📌'} {data.subtopic.name}
-        </Text>
-        <Text className="block text-sm text-stone-500 mt-1">{data.topic_name}</Text>
-      </View>
-
-      {/* 精华内容摘要 */}
-      {(data.essence_summary || data.subtopic.summary) && (
-        <View className="px-4 mb-5">
-          <Card className="border-amber-100 bg-amber-50">
-            <CardContent className="p-4">
-              <View className="flex items-center mb-2">
-                <FileText size={16} color="#92400E" className="mr-2" />
-                <Text className="block text-sm font-semibold text-amber-900">
-                  内容精华
-                </Text>
-              </View>
-              <Text className="block text-sm text-stone-700 leading-relaxed">
-                {data.essence_summary || data.subtopic.summary}
+        {data.references.length === 0 ? (
+          <Card className="border-stone-100 bg-white">
+            <CardContent className="p-6">
+              <Text className="block text-sm text-stone-500 text-center">
+                还没有关联到这个子话题的外部文献
               </Text>
             </CardContent>
           </Card>
-        </View>
-      )}
-
-      {/* 两个入口卡片 */}
-      <View className="px-4 space-y-3">
-        <Card
-          className="border-stone-100 bg-white shadow-sm"
-          onClick={() => setView('interviews')}
-        >
-          <CardContent className="p-4">
-            <View className="flex items-center justify-between">
-              <View className="flex items-center flex-1">
-                <View className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center mr-3">
-                  <Quote size={20} color="#B45309" />
-                </View>
-                <View className="flex-1">
-                  <Text className="block text-base font-semibold text-stone-800">
-                    历史采访沉淀
-                  </Text>
-                  <Text className="block text-xs text-stone-500 mt-1">
-                    {data.quotes.length} 条采访记录
-                  </Text>
-                </View>
-              </View>
-              <ChevronRight size={18} color="#A8A29E" />
-            </View>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="border-stone-100 bg-white shadow-sm"
-          onClick={() => setView('references')}
-        >
-          <CardContent className="p-4">
-            <View className="flex items-center justify-between">
-              <View className="flex items-center flex-1">
-                <View className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center mr-3">
-                  <BookOpen size={20} color="#1D4ED8" />
-                </View>
-                <View className="flex-1">
-                  <Text className="block text-base font-semibold text-stone-800">
-                    外部文献
-                  </Text>
-                  <Text className="block text-xs text-stone-500 mt-1">
-                    {data.references.length} 篇文献资料
-                  </Text>
-                </View>
-              </View>
-              <ChevronRight size={18} color="#A8A29E" />
-            </View>
-          </CardContent>
-        </Card>
+        ) : (
+          <View className="space-y-3">
+            {data.references.map((item) => {
+              const tags = normalizeTags(item.tags)
+              return (
+                <Card key={item.id} className="border-stone-100 bg-white">
+                  <CardContent className="p-4">
+                    <Text className="block text-sm font-semibold text-stone-800 mb-1">
+                      {item.title}
+                    </Text>
+                    <Text className="block text-xs text-stone-500 mb-3">
+                      {item.source || '来源待补充'} / {compactDate(item.created_at)}
+                    </Text>
+                    <Text className="block text-xs text-stone-400 mb-2">
+                      添加者：{item.updated_by_name || item.created_by_name || '待补充'}
+                    </Text>
+                    <Text className="block text-sm text-stone-700 leading-relaxed">
+                      {item.summary || item.content}
+                    </Text>
+                    {tags.length > 0 && (
+                      <>
+                        <Separator className="my-3" />
+                        <View className="flex flex-wrap gap-2">
+                          {tags.map((tag) => (
+                            <Badge key={tag} variant="secondary">
+                              <Text className="text-xs">{tag}</Text>
+                            </Badge>
+                          ))}
+                        </View>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </View>
+        )}
       </View>
     </View>
   )

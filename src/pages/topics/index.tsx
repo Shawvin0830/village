@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Network } from '@/network'
-import { Plus, ChevronRight, Search, FileText, BookOpen, Trash2, Settings } from 'lucide-react-taro'
+import { getStoredOperatorIdentity, roleCanDelete, roleCanEdit, type OperatorRole } from '@/identity'
+import { Plus, ChevronRight, Search, FileText, BookOpen, Trash2 } from 'lucide-react-taro'
 
 interface Topic {
   id: string
@@ -19,6 +20,8 @@ interface Topic {
   subtopic_count: number
   interview_count?: number
   reference_count?: number
+  created_by_name?: string | null
+  updated_by_name?: string | null
   created_at: string
 }
 
@@ -34,7 +37,7 @@ const TopicsPage = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
-  const [editMode, setEditMode] = useState(false)
+  const [operatorRole, setOperatorRole] = useState<OperatorRole>(getStoredOperatorIdentity().role)
 
   const fetchTopics = useCallback(async () => {
     try {
@@ -53,6 +56,7 @@ const TopicsPage = () => {
   }, [])
 
   useDidShow(() => {
+    setOperatorRole(getStoredOperatorIdentity().role)
     fetchTopics()
   })
 
@@ -86,6 +90,14 @@ const TopicsPage = () => {
 
   const goToDetail = (topicId: string) => {
     Taro.navigateTo({ url: `/pages/topic-detail/index?id=${topicId}` })
+  }
+
+  const openCreateDialog = () => {
+    if (!roleCanEdit(operatorRole)) {
+      Taro.showToast({ title: '当前身份只能查看', icon: 'none' })
+      return
+    }
+    setShowCreate(true)
   }
 
   const handleDeleteTopic = async (
@@ -136,25 +148,14 @@ const TopicsPage = () => {
           <Text className="block text-xl font-bold text-stone-800">话题管理</Text>
           <Text className="block text-sm text-stone-500">管理你的村庄记忆话题</Text>
         </View>
-        <View className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            className={editMode ? 'bg-amber-100 text-amber-700' : 'text-stone-500'}
-            onClick={() => setEditMode(!editMode)}
-          >
-            <Settings size={16} color={editMode ? '#B45309' : '#78716C'} className="mr-1" />
-            <Text className="text-xs">{editMode ? '完成' : '管理'}</Text>
-          </Button>
-          <Button
-            size="sm"
-            className="bg-amber-700 hover:bg-amber-800 text-white"
-            onClick={() => setShowCreate(true)}
-          >
-            <Plus size={16} color="#B45309" className="mr-1" />
-            <Text>新建</Text>
-          </Button>
-        </View>
+        <Button
+          size="sm"
+          className="bg-amber-700 hover:bg-amber-800 text-white"
+          onClick={openCreateDialog}
+        >
+          <Plus size={16} color="#B45309" className="mr-1" />
+          <Text>新建</Text>
+        </Button>
       </View>
 
       {/* 搜索与材料入口 */}
@@ -208,7 +209,7 @@ const TopicsPage = () => {
             </Text>
             <Button
               className="bg-amber-700 text-white"
-              onClick={() => setShowCreate(true)}
+              onClick={openCreateDialog}
             >
               <Plus size={16} color="#B45309" className="mr-1" />
               <Text>创建第一个话题</Text>
@@ -242,6 +243,10 @@ const TopicsPage = () => {
                           {topic.description}
                         </Text>
                       )}
+                      <Text className="block text-xs text-stone-400 mb-2">
+                        创建者：{topic.created_by_name || '待补充'}
+                        {topic.updated_by_name ? ` / 最近编辑：${topic.updated_by_name}` : ''}
+                      </Text>
                       <View className="flex items-center gap-2">
                         <Badge className="bg-amber-50 text-amber-700 border-amber-200">
                           <Text className="text-xs">{topic.subtopic_count} 个子话题</Text>
@@ -258,7 +263,7 @@ const TopicsPage = () => {
                       </View>
                     </View>
                     <View className="flex items-center ml-2">
-                      {editMode && (
+                      {roleCanDelete(operatorRole) && (
                         <Button
                           size="sm"
                           variant="ghost"

@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Headers, HttpCode } from '@nestjs/common';
 import { TopicsService } from './topics.service';
+import type { OperatorHeaders } from '@/operators/operators.service';
 
 @Controller('topics')
 export class TopicsController {
@@ -28,15 +29,21 @@ export class TopicsController {
 
   @Post()
   @HttpCode(200)
-  async create(@Body() body: { name: string; description?: string }) {
-    const data = await this.topicsService.create(body.name, body.description);
+  async create(
+    @Body() body: { name: string; description?: string },
+    @Headers() headers: OperatorHeaders,
+  ) {
+    const data = await this.topicsService.create(body.name, body.description, headers);
     return { code: 200, msg: 'success', data };
   }
 
   @Delete(':id')
   @HttpCode(200)
-  async deleteTopic(@Param('id') id: string) {
-    const data = await this.topicsService.deleteTopic(id);
+  async deleteTopic(
+    @Param('id') id: string,
+    @Headers() headers: OperatorHeaders,
+  ) {
+    const data = await this.topicsService.deleteTopic(id, headers);
     return { code: 200, msg: 'success', data };
   }
 
@@ -52,8 +59,9 @@ export class TopicsController {
   async createSubtopic(
     @Param('id') id: string,
     @Body() body: { name: string; icon?: string },
+    @Headers() headers: OperatorHeaders,
   ) {
-    const data = await this.topicsService.createSubtopic(id, body.name, body.icon);
+    const data = await this.topicsService.createSubtopic(id, body.name, body.icon, headers);
     return { code: 200, msg: 'success', data };
   }
 
@@ -77,6 +85,7 @@ export class TopicsController {
       auth_person?: string;
       restriction?: string;
     },
+    @Headers() headers: OperatorHeaders,
   ) {
     const data = await this.topicsService.updateSubtopicAuth(
       id,
@@ -84,6 +93,7 @@ export class TopicsController {
       body.auth_level,
       body.auth_person,
       body.restriction,
+      headers,
     );
     return { code: 200, msg: 'success', data };
   }
@@ -102,6 +112,7 @@ export class TopicsController {
       auth_note?: string;
       topic_affiliations?: Array<{ primary: string; secondary: string }>;
     },
+    @Headers() headers: OperatorHeaders,
   ) {
     const data = await this.topicsService.updateIntervieweeAuthorization(
       id,
@@ -115,6 +126,7 @@ export class TopicsController {
         authNote: body.auth_note,
         topicAffiliations: body.topic_affiliations,
       },
+      headers,
     );
     return { code: 200, msg: 'success', data };
   }
@@ -124,70 +136,9 @@ export class TopicsController {
   async deleteSubtopic(
     @Param('id') id: string,
     @Param('subId') subId: string,
+    @Headers() headers: OperatorHeaders,
   ) {
-    const data = await this.topicsService.deleteSubtopic(id, subId);
-    return { code: 200, msg: 'success', data };
-  }
-
-  /** 获取子话题下的采访记录（quotes）列表 */
-  @Get(':id/subtopics/:subId/quotes')
-  @HttpCode(200)
-  async getQuotes(
-    @Param('id') id: string,
-    @Param('subId') subId: string,
-  ) {
-    const data = await this.topicsService.getQuotes(id, subId);
-    return { code: 200, msg: 'success', data };
-  }
-
-  /** 创建采访记录 */
-  @Post(':id/subtopics/:subId/quotes')
-  @HttpCode(200)
-  async createQuote(
-    @Param('id') id: string,
-    @Param('subId') subId: string,
-    @Body() body: {
-      interviewee_name: string;
-      age?: string | null;
-      occupation?: string | null;
-      role?: string | null;
-      quote?: string | null;
-      full_interview: string;
-    },
-  ) {
-    const data = await this.topicsService.createQuote(id, subId, body);
-    return { code: 200, msg: 'success', data };
-  }
-
-  /** 更新采访记录 */
-  @Put(':id/subtopics/:subId/quotes/:quoteId')
-  @HttpCode(200)
-  async updateQuote(
-    @Param('id') id: string,
-    @Param('subId') subId: string,
-    @Param('quoteId') quoteId: string,
-    @Body() body: {
-      interviewee_name?: string;
-      age?: string | null;
-      occupation?: string | null;
-      role?: string | null;
-      quote?: string | null;
-      full_interview?: string;
-    },
-  ) {
-    const data = await this.topicsService.updateQuote(id, subId, quoteId, body);
-    return { code: 200, msg: 'success', data };
-  }
-
-  /** 删除采访记录 */
-  @Delete(':id/subtopics/:subId/quotes/:quoteId')
-  @HttpCode(200)
-  async deleteQuote(
-    @Param('id') id: string,
-    @Param('subId') subId: string,
-    @Param('quoteId') quoteId: string,
-  ) {
-    const data = await this.topicsService.deleteQuote(id, subId, quoteId);
+    const data = await this.topicsService.deleteSubtopic(id, subId, headers);
     return { code: 200, msg: 'success', data };
   }
 
@@ -202,13 +153,6 @@ export class TopicsController {
   @HttpCode(200)
   async getAuthOverview(@Param('id') id: string) {
     const data = await this.topicsService.getAuthOverview(id);
-    return { code: 200, msg: 'success', data };
-  }
-
-  @Post(':id/archive')
-  @HttpCode(200)
-  async archiveTopic(@Param('id') id: string) {
-    const data = await this.topicsService.archiveTopic(id);
     return { code: 200, msg: 'success', data };
   }
 }

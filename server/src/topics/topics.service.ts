@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { AuthorizationManagerSkill } from '@/skills/authorization-manager.skill';
+import {
+  OperatorsService,
+  type OperatorContext,
+  type OperatorHeaders,
+} from '@/operators/operators.service';
 
 type TopicAffiliation = {
   primary: string;
@@ -20,6 +25,8 @@ type AnalysisSegment = {
 type InterviewRecord = {
   id: string;
   created_at?: string | null;
+  created_by_name?: string | null;
+  updated_by_name?: string | null;
   mandarin_text?: string | null;
   dialect_original?: string | null;
   transcript_text?: string | null;
@@ -82,68 +89,52 @@ export class TopicsService {
     return getSupabaseClient();
   }
 
-  constructor(private readonly authSkill: AuthorizationManagerSkill) {}
+  constructor(
+    private readonly authSkill: AuthorizationManagerSkill,
+    private readonly operatorsService: OperatorsService,
+  ) {}
 
   async findAll() {
     const { data, error } = await this.client
       .from('topics')
-      .select('id, name, description, status, created_at')
+      .select('id, name, description, status, created_by_name, updated_by_name, created_at')
       .order('created_at', { ascending: false });
     if (error) throw new Error(`查询话题列表失败: ${error.message}`);
 
-    const topicsWithDetails = await Promise.all(
+    const topicsWithCount = await Promise.all(
       (data || []).map(async (topic) => {
-        // 子话题数量
-        const { count: subtopicCount } = await this.client
+        const { count } = await this.client
           .from('subtopics')
           .select('*', { count: 'exact', head: true })
           .eq('topic_id', topic.id);
 
-        // 是否有采访策划
-        const { data: plans } = await this.client
-          .from('interview_plans')
-          .select('id')
-          .eq('topic_id', topic.id)
-          .limit(1);
-
-        // 已授权的受访人数
-        const { count: authorizedCount } = await this.client
-          .from('interviewees')
-          .select('*', { count: 'exact', head: true })
-          .eq('topic_id', topic.id)
-          .eq('auth_status', 'agreed');
-
-        // 采访记录总数（原始文件）
         const { count: interviewCount } = await this.client
-          .from('interview_records')
-          .select('*', { count: 'exact', head: true })
-          .eq('topic_id', topic.id);
-
-        // 已整理的记录数量
-        const { count: organizedCount } = await this.client
           .from('interview_records')
           .select('*', { count: 'exact', head: true })
           .eq('topic_id', topic.id)
           .eq('status', 'completed');
 
+        const { count: referenceCount } = await this.client
+          .from('reference_materials')
+          .select('*', { count: 'exact', head: true })
+          .eq('topic_id', topic.id);
+
         return {
           ...topic,
-          subtopic_count: subtopicCount || 0,
-          has_interview_plan: plans && plans.length > 0,
-          authorized_count: authorizedCount || 0,
+          subtopic_count: count || 0,
           interview_count: interviewCount || 0,
-          organized_count: organizedCount || 0,
+          reference_count: referenceCount || 0,
         };
       }),
     );
 
-    return topicsWithDetails;
+    return topicsWithCount;
   }
 
   async findOne(id: string) {
     const { data: topic, error: topicError } = await this.client
       .from('topics')
-      .select('id, name, description, status, created_at')
+      .select('id, name, description, status, created_by_name, updated_by_name, created_at')
       .eq('id', id)
       .maybeSingle();
     if (topicError) throw new Error(`查询话题失败: ${topicError.message}`);
@@ -151,7 +142,7 @@ export class TopicsService {
 
     const { data: subtopics, error: subError } = await this.client
       .from('subtopics')
-      .select('id, name, icon, transcript_status, verify_status, auth_level, summary')
+      .select('id, name, icon, transcript_status, verify_status, auth_level, summary, created_by_name, updated_by_name')
       .eq('topic_id', id)
       .order('created_at', { ascending: true });
     if (subError) throw new Error(`查询子话题失败: ${subError.message}`);
@@ -159,42 +150,94 @@ export class TopicsService {
     return { ...topic, subtopics: subtopics || [] };
   }
 
-  async create(name: string, description?: string) {
+  async create(name: string, description?: string, headers?: OperatorHeaders) {
+    const operator = await this.requireOperator(headers, 'create_topic');
+    const now = new Date().toISOString();
     const { data, error } = await this.client
       .from('topics')
-      .insert({ name, description: description || null })
+      .insert({
+        name,
+        description: description || null,
+        created_by: operator.id,
+        created_by_name: operator.display_name,
+        updated_by: operator.id,
+        updated_by_name: operator.display_name,
+        updated_at: now,
+      })
       .select()
       .single();
     if (error) throw new Error(`创建话题失败: ${error.message}`);
+    await this.operatorsService.writeLog({
+      operator,
+      actionType: 'create_topic',
+      targetType: 'topic',
+      targetId: data.id,
+      targetName: data.name,
+      summary: `${operator.display_name} 创建了话题「${data.name}」`,
+    });
     return data;
   }
 
-  async deleteTopic(id: string) {
+  async deleteTopic(id: string, headers?: OperatorHeaders) {
+    const operator = await this.requireOperator(headers, 'delete_topic');
+    const { data: topic } = await this.client
+      .from('topics')
+      .select('id, name')
+      .eq('id', id)
+      .maybeSingle();
+
     const { error } = await this.client
       .from('topics')
       .delete()
       .eq('id', id);
     if (error) throw new Error(`删除话题失败: ${error.message}`);
+    await this.operatorsService.writeLog({
+      operator,
+      actionType: 'delete_topic',
+      targetType: 'topic',
+      targetId: id,
+      targetName: topic?.name || id,
+      summary: `${operator.display_name} 删除了话题「${topic?.name || id}」`,
+    });
     return { success: true };
   }
 
   async getSubtopics(topicId: string) {
     const { data, error } = await this.client
       .from('subtopics')
-      .select('id, name, icon, transcript_status, verify_status, auth_level, summary')
+      .select('id, name, icon, transcript_status, verify_status, auth_level, summary, created_by_name, updated_by_name')
       .eq('topic_id', topicId)
       .order('created_at', { ascending: true });
     if (error) throw new Error(`查询子话题失败: ${error.message}`);
     return data || [];
   }
 
-  async createSubtopic(topicId: string, name: string, icon?: string) {
+  async createSubtopic(topicId: string, name: string, icon?: string, headers?: OperatorHeaders) {
+    const operator = await this.requireOperator(headers, 'create_subtopic');
+    const now = new Date().toISOString();
     const { data, error } = await this.client
       .from('subtopics')
-      .insert({ topic_id: topicId, name, icon: icon || '📌' })
+      .insert({
+        topic_id: topicId,
+        name,
+        icon: icon || '📌',
+        created_by: operator.id,
+        created_by_name: operator.display_name,
+        updated_by: operator.id,
+        updated_by_name: operator.display_name,
+        updated_at: now,
+      })
       .select()
       .single();
     if (error) throw new Error(`创建子话题失败: ${error.message}`);
+    await this.operatorsService.writeLog({
+      operator,
+      actionType: 'create_subtopic',
+      targetType: 'subtopic',
+      targetId: data.id,
+      targetName: data.name,
+      summary: `${operator.display_name} 在话题中添加了子话题「${data.name}」`,
+    });
     return data;
   }
 
@@ -218,7 +261,7 @@ export class TopicsService {
 
     const { data: records, error: recordsError } = await this.client
       .from('interview_records')
-      .select('id, created_at, mandarin_text, dialect_original, transcript_text, ai_analysis')
+      .select('id, created_at, created_by_name, updated_by_name, mandarin_text, dialect_original, transcript_text, ai_analysis')
       .eq('topic_id', topicId)
       .eq('subtopic_id', subtopicId)
       .eq('status', 'completed')
@@ -251,6 +294,8 @@ export class TopicsService {
         summary: shortText(firstSegment?.summary || text, 120),
         full_interview: text || '暂无完整采访整理文本',
         created_at: record.created_at || null,
+        created_by_name: record.created_by_name || null,
+        updated_by_name: record.updated_by_name || null,
         interviewee: {
           id: savedPerson?.id || `temp-${index}-${record.id}`,
           name: String(savedPerson?.name || base.name),
@@ -267,34 +312,16 @@ export class TopicsService {
 
     const { data: references, error: referencesError } = await this.client
       .from('reference_materials')
-      .select('id, title, content, source, url, tags, created_at')
+      .select('id, title, content, source, url, tags, created_by_name, updated_by_name, created_at')
       .eq('topic_id', topicId)
       .eq('subtopic_id', subtopicId)
       .order('created_at', { ascending: false });
     if (referencesError) throw new Error(`查询外部文献失败: ${referencesError.message}`);
 
-    const essenceSummary = this.buildEssenceSummary(
-      subtopic.name,
-      quotes.map((q) => ({
-        quote: q.quote,
-        interviewee: {
-          name: String(q.interviewee.name),
-          occupation: q.interviewee.occupation ? String(q.interviewee.occupation) : null,
-          role: q.interviewee.role ? String(q.interviewee.role) : null,
-        },
-      })),
-      (references || []).map((item) => ({
-        title: item.title,
-        content: item.content,
-        source: item.source,
-      })),
-    );
-
     return {
       topic_id: topic.id,
       topic_name: topic.name,
       subtopic,
-      essence_summary: essenceSummary,
       quotes,
       references: (references || []).map((item) => ({
         id: item.id,
@@ -304,70 +331,36 @@ export class TopicsService {
         tags: item.tags || [],
         summary: shortText(item.content, 160),
         content: item.content,
+        created_by_name: item.created_by_name || null,
+        updated_by_name: item.updated_by_name || null,
         created_at: item.created_at,
       })),
     };
   }
 
-  /**
-   * 根据子话题名称、采访摘录、外部文献，动态生成 200-300 字的精华摘要。
-   * 格式：为什么研究 → 查了哪些资料/采访了谁 → 获得了什么
-   */
-  private buildEssenceSummary(
-    subtopicName: string,
-    quotes: Array<{
-      quote: string;
-      interviewee: { name: string; occupation?: string | null; role?: string | null };
-    }>,
-    references: Array<{ title: string; content: string; source?: string | null }>,
-  ): string {
-    const parts: string[] = [];
+  async deleteSubtopic(topicId: string, subtopicId: string, headers?: OperatorHeaders) {
+    const operator = await this.requireOperator(headers, 'delete_subtopic');
+    const { data: subtopic } = await this.client
+      .from('subtopics')
+      .select('id, name')
+      .eq('id', subtopicId)
+      .eq('topic_id', topicId)
+      .maybeSingle();
 
-    // 1. 为什么研究
-    parts.push(`「${subtopicName}」是村落文化记忆的重要组成部分，对其进行系统梳理有助于还原历史面貌、传承地方文脉。`);
-
-    // 2. 查了哪些资料、采访了谁
-    const peopleList = [...new Set(quotes.map((q) => q.interviewee.name))].filter(Boolean);
-    const refTitles = references.map((r) => r.title).filter(Boolean);
-
-    const researchBits: string[] = [];
-    if (quotes.length > 0) {
-      const exampleNames = peopleList.slice(0, 3).join('、');
-      const more = peopleList.length > 3 ? `等 ${peopleList.length} 位` : '';
-      researchBits.push(`已采集 ${exampleNames}${more} 的口述记忆`);
-    }
-    if (references.length > 0) {
-      const uniqueTitles = [...new Set(refTitles)];
-      const exampleTitles = uniqueTitles.slice(0, 2).map((t) => `《${t}》`).join('、');
-      const more = uniqueTitles.length > 2 ? `等 ${uniqueTitles.length} 篇` : '';
-      researchBits.push(`查阅了 ${exampleTitles || '相关文献'}${more} 外部资料`);
-    }
-
-    if (researchBits.length > 0) {
-      parts.push(`目前，${researchBits.join('，')}。`);
-    } else {
-      parts.push('目前该子话题的资料采集尚处于初期阶段，尚未录入采访记录或外部文献。');
-    }
-
-    // 3. 获得了什么
-    if (quotes.length > 0) {
-      const topQuote = quotes[0]?.quote || '';
-      const snippet = topQuote.length > 60 ? `${topQuote.slice(0, 60)}…` : topQuote;
-      parts.push(`通过整理，已初步提炼出关键口述片段，如"${snippet}"等，为后续深入研究提供了扎实的一手素材。`);
-    } else if (references.length > 0) {
-      parts.push('通过文献梳理，已初步掌握该子话题的基本脉络与核心信息，为后续深入研究奠定了基础。');
-    }
-
-    return parts.join('');
-  }
-
-  async deleteSubtopic(topicId: string, subtopicId: string) {
     const { error } = await this.client
       .from('subtopics')
       .delete()
       .eq('id', subtopicId)
       .eq('topic_id', topicId);
     if (error) throw new Error(`删除子话题失败: ${error.message}`);
+    await this.operatorsService.writeLog({
+      operator,
+      actionType: 'delete_subtopic',
+      targetType: 'subtopic',
+      targetId: subtopicId,
+      targetName: subtopic?.name || subtopicId,
+      summary: `${operator.display_name} 删除了子话题「${subtopic?.name || subtopicId}」`,
+    });
     return { success: true };
   }
 
@@ -377,14 +370,19 @@ export class TopicsService {
     authLevel: string,
     authPerson?: string,
     restriction?: string,
+    headers?: OperatorHeaders,
   ) {
-    return this.authSkill.updateAuth(
+    const operator = await this.requireOperator(headers, 'update_authorization');
+    const result = await this.authSkill.updateAuth(
       topicId,
       subtopicId,
       authLevel,
       authPerson,
       restriction,
+      operator,
     );
+    await this.writeOperatorLog(operator, 'update_authorization', 'subtopic', subtopicId, authPerson || subtopicId, '确认了受访人授权状态');
+    return result;
   }
 
   async updateIntervieweeAuthorization(
@@ -399,8 +397,12 @@ export class TopicsService {
       authNote?: string;
       topicAffiliations?: Array<{ primary: string; secondary: string }>;
     },
+    headers?: OperatorHeaders,
   ) {
-    return this.authSkill.updateIntervieweeAuthorization(topicId, intervieweeId, payload);
+    const operator = await this.requireOperator(headers, 'update_interviewee');
+    const result = await this.authSkill.updateIntervieweeAuthorization(topicId, intervieweeId, payload, operator);
+    await this.writeOperatorLog(operator, 'update_interviewee', 'interviewee', result.id, result.name, '编辑了受访人档案和授权状态');
+    return result;
   }
 
   async getAuthList(topicId: string) {
@@ -466,267 +468,27 @@ export class TopicsService {
     };
   }
 
-  /** 获取子话题下的采访记录列表（quotes 格式） */
-  async getQuotes(topicId: string, subtopicId: string) {
-    const { data: records, error } = await this.client
-      .from('interview_records')
-      .select('id, created_at, mandarin_text, dialect_original, transcript_text, ai_analysis')
-      .eq('topic_id', topicId)
-      .eq('subtopic_id', subtopicId)
-      .eq('status', 'completed')
-      .order('created_at', { ascending: false });
-    if (error) throw new Error(`查询采访记录失败: ${error.message}`);
+  private async requireOperator(headers: OperatorHeaders | undefined, capability: string): Promise<OperatorContext> {
+    const operator = await this.operatorsService.require(headers || {});
+    this.operatorsService.assertCan(operator, capability);
+    return operator;
+  }
 
-    const { data: people } = await this.client
-      .from('interviewees')
-      .select('id, name, age, occupation, role')
-      .eq('topic_id', topicId);
-
-    const peopleByName = new Map<string, Record<string, unknown>>();
-    for (const person of people || []) {
-      peopleByName.set(String(person.name), person);
-    }
-
-    const quotes = ((records || []) as InterviewRecord[]).map((record, index) => {
-      const segments = extractSegments(record);
-      const text = getRecordText(record);
-      const firstSegment = segments[0];
-      const base = extractPersonBase(record);
-      const savedPerson = peopleByName.get(base.name);
-      const quoteText =
-        shortText(firstSegment?.quote || firstSegment?.source_text || firstSegment?.mandarin_text || firstSegment?.summary || text, 160) ||
-        '暂无摘录';
-
-      return {
-        id: record.id,
-        quote: quoteText,
-        summary: shortText(firstSegment?.summary || text, 120),
-        full_interview: text || '',
-        created_at: record.created_at || null,
-        interviewee: {
-          id: savedPerson?.id || `temp-${index}-${record.id}`,
-          name: String(savedPerson?.name || base.name),
-          age: savedPerson?.age || base.age || null,
-          occupation: savedPerson?.occupation || base.occupation || null,
-          role: savedPerson?.role || base.role || null,
-        },
-      };
+  private async writeOperatorLog(
+    operator: OperatorContext,
+    actionType: string,
+    targetType: string,
+    targetId: string,
+    targetName: string,
+    summary: string,
+  ) {
+    await this.operatorsService.writeLog({
+      operator,
+      actionType,
+      targetType,
+      targetId,
+      targetName,
+      summary: `${operator.display_name} ${summary}`,
     });
-
-    return quotes;
-  }
-
-  /** 创建采访记录 */
-  async createQuote(
-    topicId: string,
-    subtopicId: string,
-    body: {
-      interviewee_name: string;
-      age?: string | null;
-      occupation?: string | null;
-      role?: string | null;
-      quote?: string | null;
-      full_interview: string;
-    },
-  ) {
-    // 1. 查找或创建受访人
-    let intervieweeId: string | null = null;
-    const { data: existing } = await this.client
-      .from('interviewees')
-      .select('id')
-      .eq('topic_id', topicId)
-      .eq('name', body.interviewee_name)
-      .maybeSingle();
-
-    if (existing) {
-      intervieweeId = existing.id;
-      // 更新受访人信息
-      const updateData: Record<string, unknown> = {};
-      if (body.age) updateData.age = body.age;
-      if (body.occupation) updateData.occupation = body.occupation;
-      if (body.role) updateData.role = body.role;
-      if (Object.keys(updateData).length > 0) {
-        await this.client.from('interviewees').update(updateData).eq('id', intervieweeId);
-      }
-    } else {
-      const { data: newPerson, error: personError } = await this.client
-        .from('interviewees')
-        .insert({
-          topic_id: topicId,
-          name: body.interviewee_name,
-          age: body.age || null,
-          occupation: body.occupation || null,
-          role: body.role || null,
-        })
-        .select('id')
-        .single();
-      if (personError) throw new Error(`创建受访人失败: ${personError.message}`);
-      intervieweeId = newPerson.id;
-    }
-
-    // 2. 创建采访记录
-    const aiAnalysis = {
-      interviewee: {
-        name: body.interviewee_name,
-        age: body.age || null,
-        occupation: body.occupation || null,
-        role: body.role || null,
-      },
-      segments: [
-        {
-          quote: body.quote || shortText(body.full_interview, 160),
-          summary: shortText(body.full_interview, 120),
-        },
-      ],
-    };
-
-    const { data: record, error: recordError } = await this.client
-      .from('interview_records')
-      .insert({
-        topic_id: topicId,
-        subtopic_id: subtopicId,
-        mandarin_text: body.full_interview,
-        status: 'completed',
-        ai_analysis: aiAnalysis,
-      })
-      .select()
-      .single();
-    if (recordError) throw new Error(`创建采访记录失败: ${recordError.message}`);
-
-    return {
-      id: record.id,
-      quote: body.quote || shortText(body.full_interview, 160),
-      full_interview: body.full_interview,
-      created_at: record.created_at,
-      interviewee: {
-        id: intervieweeId,
-        name: body.interviewee_name,
-        age: body.age || null,
-        occupation: body.occupation || null,
-        role: body.role || null,
-      },
-    };
-  }
-
-  /** 更新采访记录 */
-  async updateQuote(
-    topicId: string,
-    subtopicId: string,
-    quoteId: string,
-    body: {
-      interviewee_name?: string;
-      age?: string | null;
-      occupation?: string | null;
-      role?: string | null;
-      quote?: string | null;
-      full_interview?: string;
-    },
-  ) {
-    // 1. 获取现有记录
-    const { data: existing, error: fetchError } = await this.client
-      .from('interview_records')
-      .select('id, ai_analysis, mandarin_text')
-      .eq('id', quoteId)
-      .eq('topic_id', topicId)
-      .maybeSingle();
-    if (fetchError) throw new Error(`查询记录失败: ${fetchError.message}`);
-    if (!existing) throw new Error('记录不存在');
-
-    // 2. 更新受访人信息
-    if (body.interviewee_name) {
-      const oldAnalysis = (existing.ai_analysis || {}) as Record<string, unknown>;
-      const oldInterviewee = (oldAnalysis.interviewee || {}) as Record<string, unknown>;
-      const oldName = String(oldInterviewee.name || '');
-
-      const { data: person } = await this.client
-        .from('interviewees')
-        .select('id')
-        .eq('topic_id', topicId)
-        .eq('name', oldName)
-        .maybeSingle();
-
-      if (person) {
-        const updateData: Record<string, unknown> = { name: body.interviewee_name };
-        if (body.age !== undefined) updateData.age = body.age;
-        if (body.occupation !== undefined) updateData.occupation = body.occupation;
-        if (body.role !== undefined) updateData.role = body.role;
-        await this.client.from('interviewees').update(updateData).eq('id', person.id);
-      }
-    }
-
-    // 3. 更新采访记录
-    const fullText = body.full_interview || existing.mandarin_text || '';
-    const quoteText = body.quote || shortText(fullText, 160);
-
-    const newAnalysis = {
-      interviewee: {
-        name: body.interviewee_name || '',
-        age: body.age || null,
-        occupation: body.occupation || null,
-        role: body.role || null,
-      },
-      segments: [
-        {
-          quote: quoteText,
-          summary: shortText(fullText, 120),
-        },
-      ],
-    };
-
-    const updateData: Record<string, unknown> = {
-      ai_analysis: newAnalysis,
-      updated_at: new Date().toISOString(),
-    };
-    if (body.full_interview !== undefined) {
-      updateData.mandarin_text = body.full_interview;
-    }
-
-    const { data: record, error: updateError } = await this.client
-      .from('interview_records')
-      .update(updateData)
-      .eq('id', quoteId)
-      .select()
-      .single();
-    if (updateError) throw new Error(`更新采访记录失败: ${updateError.message}`);
-
-    return {
-      id: record.id,
-      quote: quoteText,
-      full_interview: fullText,
-      created_at: record.created_at,
-      interviewee: {
-        name: body.interviewee_name || '',
-        age: body.age || null,
-        occupation: body.occupation || null,
-        role: body.role || null,
-      },
-    };
-  }
-
-  /** 删除采访记录 */
-  async deleteQuote(topicId: string, subtopicId: string, quoteId: string) {
-    const { error } = await this.client
-      .from('interview_records')
-      .delete()
-      .eq('id', quoteId)
-      .eq('topic_id', topicId)
-      .eq('subtopic_id', subtopicId);
-    if (error) throw new Error(`删除采访记录失败: ${error.message}`);
-    return { success: true };
-  }
-
-  /** 归档话题 */
-  async archiveTopic(topicId: string) {
-    const { data, error } = await this.client
-      .from('topics')
-      .update({ 
-        status: 'archived',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', topicId)
-      .select()
-      .single();
-    if (error) throw new Error(`归档话题失败: ${error.message}`);
-    return data;
   }
 }

@@ -1,6 +1,6 @@
 import { View, Text } from '@tarojs/components'
 import { useState, useCallback } from 'react'
-import Taro, { useLoad , useRouter } from '@tarojs/taro'
+import Taro, { useDidShow, useLoad , useRouter } from '@tarojs/taro'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -8,7 +8,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Network } from '@/network'
-import { Plus, BookOpen, Mic, ShieldCheck, Trash2, ChevronRight, Settings } from 'lucide-react-taro'
+import { getStoredOperatorIdentity, roleCanDelete, roleCanEdit, type OperatorRole } from '@/identity'
+import { Plus, BookOpen, Mic, ShieldCheck, Trash2, ChevronRight, Quote } from 'lucide-react-taro'
 
 interface Subtopic {
   id: string
@@ -18,6 +19,8 @@ interface Subtopic {
   verify_status: string
   auth_level: string
   summary: string | null
+  created_by_name?: string | null
+  updated_by_name?: string | null
 }
 
 interface TopicDetail {
@@ -26,6 +29,8 @@ interface TopicDetail {
   description: string | null
   status: string
   subtopics: Subtopic[]
+  created_by_name?: string | null
+  updated_by_name?: string | null
   created_at: string
 }
 
@@ -46,7 +51,7 @@ const TopicDetailPage = () => {
   const [subName, setSubName] = useState('')
   const [subIcon, setSubIcon] = useState('📌')
   const [adding, setAdding] = useState(false)
-  const [editMode, setEditMode] = useState(false)
+  const [operatorRole, setOperatorRole] = useState<OperatorRole>(getStoredOperatorIdentity().role)
 
   const ICONS = ['📌', '🏛️', '🪵', '🐉', '🎭', '🍵', '🏮', '🎋', '📿', '🧱']
 
@@ -70,6 +75,18 @@ const TopicDetailPage = () => {
   useLoad(() => {
     fetchDetail()
   })
+
+  useDidShow(() => {
+    setOperatorRole(getStoredOperatorIdentity().role)
+  })
+
+  const openAddSubtopic = () => {
+    if (!roleCanEdit(operatorRole)) {
+      Taro.showToast({ title: '当前身份只能查看', icon: 'none' })
+      return
+    }
+    setShowAddSub(true)
+  }
 
   const handleAddSubtopic = async () => {
     if (!subName.trim()) {
@@ -114,27 +131,6 @@ const TopicDetailPage = () => {
     }
   }
 
-  const handleDeleteTopic = async () => {
-    const modal = await Taro.showModal({
-      title: '确认删除话题',
-      content: '删除话题将同时删除所有子话题和相关数据，此操作不可恢复。确定要删除吗？',
-    })
-    if (!modal.confirm) return
-    try {
-      await Network.request({
-        url: `/api/topics/${topicId}`,
-        method: 'DELETE',
-      })
-      Taro.showToast({ title: '已删除', icon: 'success' })
-      setTimeout(() => {
-        Taro.navigateBack()
-      }, 1500)
-    } catch (err) {
-      console.error('删除话题失败:', err)
-      Taro.showToast({ title: '删除失败', icon: 'none' })
-    }
-  }
-
   const goToSubtopicMaterials = (subId: string) => {
     Taro.navigateTo({ url: `/pages/subtopic-materials/index?topicId=${topicId}&subtopicId=${subId}` })
   }
@@ -162,36 +158,14 @@ const TopicDetailPage = () => {
     <View className="min-h-screen bg-stone-50 pb-8">
       {/* 话题信息 */}
       <View className="px-4 pt-6 pb-4">
-        <View className="flex items-start justify-between mb-1">
-          <View className="flex-1">
-            <Text className="block text-xl font-bold text-stone-800">{topic.name}</Text>
-            {topic.description && (
-              <Text className="block text-sm text-stone-500 mt-1">{topic.description}</Text>
-            )}
-          </View>
-          <View className="flex items-center gap-2">
-            {editMode && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-red-500"
-                onClick={handleDeleteTopic}
-              >
-                <Trash2 size={16} color="#EF4444" className="mr-1" />
-                <Text className="text-xs">删除话题</Text>
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="ghost"
-              className={editMode ? 'bg-amber-100 text-amber-700' : 'text-stone-500'}
-              onClick={() => setEditMode(!editMode)}
-            >
-              <Settings size={18} color={editMode ? '#B45309' : '#78716C'} className="mr-1" />
-              <Text className="text-xs">{editMode ? '完成' : '管理'}</Text>
-            </Button>
-          </View>
-        </View>
+        <Text className="block text-xl font-bold text-stone-800 mb-1">{topic.name}</Text>
+        {topic.description && (
+          <Text className="block text-sm text-stone-500">{topic.description}</Text>
+        )}
+        <Text className="block text-xs text-stone-400 mt-2">
+          创建者：{topic.created_by_name || '待补充'}
+          {topic.updated_by_name ? ` / 最近编辑：${topic.updated_by_name}` : ''}
+        </Text>
       </View>
 
       {/* 快捷操作 */}
@@ -228,10 +202,12 @@ const TopicDetailPage = () => {
       <View className="px-4">
         <View className="flex items-center justify-between mb-3">
           <Text className="block text-base font-semibold text-stone-800">子话题</Text>
-          <Button size="sm" variant="ghost" className="text-amber-700" onClick={() => setShowAddSub(true)}>
-            <Plus size={16} color="#B45309" className="mr-1" />
-            <Text>添加</Text>
-          </Button>
+          {roleCanEdit(operatorRole) && (
+            <Button size="sm" variant="ghost" className="text-amber-700" onClick={openAddSubtopic}>
+              <Plus size={16} color="#B45309" className="mr-1" />
+              <Text>添加</Text>
+            </Button>
+          )}
         </View>
 
         {topic.subtopics.length === 0 ? (
@@ -265,6 +241,10 @@ const TopicDetailPage = () => {
                               {sub.summary}
                             </Text>
                           )}
+                          <Text className="block text-xs text-stone-400 mb-2">
+                            创建者：{sub.created_by_name || '待补充'}
+                            {sub.updated_by_name ? ` / 最近编辑：${sub.updated_by_name}` : ''}
+                          </Text>
                           <View className="flex flex-wrap gap-1">
                             <Badge
                               className={`text-xs ${
@@ -302,22 +282,16 @@ const TopicDetailPage = () => {
                               </Text>
                             </Badge>
                           </View>
-                          <View
-                            className="flex items-center mt-3"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              goToSubtopicMaterials(sub.id)
-                            }}
-                          >
-                            <BookOpen size={14} color="#B45309" className="mr-1" />
+                          <View className="flex items-center mt-3">
+                            <Quote size={14} color="#B45309" className="mr-1" />
                             <Text className="text-xs text-amber-700">
-                              查看历史资料
+                              查看谁讲过这段
                             </Text>
                           </View>
                         </View>
                       </View>
                       <ChevronRight size={18} color="#A8A29E" className="mt-1 mr-1" />
-                      {editMode && (
+                      {roleCanDelete(operatorRole) && (
                         <Button
                           size="sm"
                           variant="ghost"

@@ -1,6 +1,6 @@
 import { View, Text } from "@tarojs/components";
 import { useState, useCallback } from "react";
-import Taro, { useLoad, useRouter } from "@tarojs/taro";
+import Taro, { useDidShow, useLoad, useRouter } from "@tarojs/taro";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Network } from "@/network";
+import { getStoredOperatorIdentity, roleCanEdit, type OperatorRole } from "@/identity";
 import {
   ArrowLeft,
   FileText,
@@ -53,6 +54,8 @@ interface IntervieweeCard {
   source_count: number;
   source_summary?: string;
   confirmed_at?: string | null;
+  created_by_name?: string | null;
+  updated_by_name?: string | null;
   is_temporary?: boolean;
 }
 
@@ -156,6 +159,7 @@ const AuthorizationPage = () => {
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [formState, setFormState] = useState<Record<string, IntervieweeForm>>({});
   const [customInputs, setCustomInputs] = useState<Record<string, string>>({});
+  const [operatorRole, setOperatorRole] = useState<OperatorRole>(getStoredOperatorIdentity().role);
 
   const fetchAuthList = useCallback(async () => {
     if (!topicId) return;
@@ -176,6 +180,10 @@ const AuthorizationPage = () => {
 
   useLoad(() => {
     fetchAuthList();
+  });
+
+  useDidShow(() => {
+    setOperatorRole(getStoredOperatorIdentity().role);
   });
 
   const getForm = (person: IntervieweeCard): IntervieweeForm => {
@@ -219,6 +227,10 @@ const AuthorizationPage = () => {
 
   const addInterviewee = () => {
     if (!authData) return;
+    if (!roleCanEdit(operatorRole)) {
+      Taro.showToast({ title: "当前身份只能查看", icon: "none" });
+      return;
+    }
     const id = `temp-manual-${Date.now()}`;
     const newPerson: IntervieweeCard = {
       id,
@@ -258,6 +270,10 @@ const AuthorizationPage = () => {
   };
 
   const savePerson = async (person: IntervieweeCard) => {
+    if (!roleCanEdit(operatorRole)) {
+      Taro.showToast({ title: "当前身份只能查看", icon: "none" });
+      return;
+    }
     const form = getForm(person);
     if (!form.name.trim()) {
       Taro.showToast({ title: "请填写姓名", icon: "none" });
@@ -487,6 +503,7 @@ const AuthorizationPage = () => {
                       key={option.value}
                       size="sm"
                       variant={form.authStatus === option.value ? "default" : "outline"}
+                      disabled={!roleCanEdit(operatorRole)}
                       onClick={() => updateForm(person.id, { authStatus: option.value })}
                     >
                       <Text>{option.label}</Text>
@@ -599,9 +616,18 @@ const AuthorizationPage = () => {
                 </View>
               )}
 
+              <View className="bg-stone-50 rounded-lg p-3">
+                <Text className="block text-xs text-stone-500">
+                  建档人：{person.created_by_name || "待补充"}
+                </Text>
+                <Text className="block text-xs text-stone-500 mt-1">
+                  最近确认：{person.updated_by_name || person.created_by_name || "待补充"}
+                </Text>
+              </View>
+
               <Button
                 className="w-full bg-amber-700 text-white"
-                disabled={saving}
+                disabled={saving || !roleCanEdit(operatorRole)}
                 onClick={() => savePerson(person)}
               >
                 <Text>{saving ? "保存中..." : "保存档案"}</Text>
@@ -668,10 +694,12 @@ const AuthorizationPage = () => {
           <Users size={18} color="#92400E" className="mr-2" />
           <Text>受访人名单</Text>
         </Button>
-        <Button className="h-auto py-4 bg-amber-700 text-white" onClick={addInterviewee}>
-          <Plus size={18} color="#FFFFFF" className="mr-2" />
-          <Text>增加受访人</Text>
-        </Button>
+        {roleCanEdit(operatorRole) && (
+          <Button className="h-auto py-4 bg-amber-700 text-white" onClick={addInterviewee}>
+            <Plus size={18} color="#FFFFFF" className="mr-2" />
+            <Text>增加受访人</Text>
+          </Button>
+        )}
       </View>
 
       <Card className="border-amber-200 bg-amber-50">
