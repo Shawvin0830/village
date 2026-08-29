@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Network } from '@/network'
-import { Plus, BookOpen, Mic, ShieldCheck, Trash2, ChevronRight } from 'lucide-react-taro'
+import { Plus, BookOpen, Mic, ShieldCheck, Trash2, ChevronRight, Settings } from 'lucide-react-taro'
 
 interface Subtopic {
   id: string
@@ -46,6 +46,7 @@ const TopicDetailPage = () => {
   const [subName, setSubName] = useState('')
   const [subIcon, setSubIcon] = useState('📌')
   const [adding, setAdding] = useState(false)
+  const [editMode, setEditMode] = useState(false)
 
   const ICONS = ['📌', '🏛️', '🪵', '🐉', '🎭', '🍵', '🏮', '🎋', '📿', '🧱']
 
@@ -113,6 +114,27 @@ const TopicDetailPage = () => {
     }
   }
 
+  const handleDeleteTopic = async () => {
+    const modal = await Taro.showModal({
+      title: '确认删除话题',
+      content: '删除话题将同时删除所有子话题和相关数据，此操作不可恢复。确定要删除吗？',
+    })
+    if (!modal.confirm) return
+    try {
+      await Network.request({
+        url: `/api/topics/${topicId}`,
+        method: 'DELETE',
+      })
+      Taro.showToast({ title: '已删除', icon: 'success' })
+      setTimeout(() => {
+        Taro.navigateBack()
+      }, 1500)
+    } catch (err) {
+      console.error('删除话题失败:', err)
+      Taro.showToast({ title: '删除失败', icon: 'none' })
+    }
+  }
+
   const goToSubtopicMaterials = (subId: string) => {
     Taro.navigateTo({ url: `/pages/subtopic-materials/index?topicId=${topicId}&subtopicId=${subId}` })
   }
@@ -140,10 +162,36 @@ const TopicDetailPage = () => {
     <View className="min-h-screen bg-stone-50 pb-8">
       {/* 话题信息 */}
       <View className="px-4 pt-6 pb-4">
-        <Text className="block text-xl font-bold text-stone-800 mb-1">{topic.name}</Text>
-        {topic.description && (
-          <Text className="block text-sm text-stone-500">{topic.description}</Text>
-        )}
+        <View className="flex items-start justify-between mb-1">
+          <View className="flex-1">
+            <Text className="block text-xl font-bold text-stone-800">{topic.name}</Text>
+            {topic.description && (
+              <Text className="block text-sm text-stone-500 mt-1">{topic.description}</Text>
+            )}
+          </View>
+          <View className="flex items-center gap-2">
+            {editMode && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-red-500"
+                onClick={handleDeleteTopic}
+              >
+                <Trash2 size={16} color="#EF4444" className="mr-1" />
+                <Text className="text-xs">删除话题</Text>
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              className={editMode ? 'bg-amber-100 text-amber-700' : 'text-stone-500'}
+              onClick={() => setEditMode(!editMode)}
+            >
+              <Settings size={18} color={editMode ? '#B45309' : '#78716C'} className="mr-1" />
+              <Text className="text-xs">{editMode ? '完成' : '管理'}</Text>
+            </Button>
+          </View>
+        </View>
       </View>
 
       {/* 快捷操作 */}
@@ -269,14 +317,16 @@ const TopicDetailPage = () => {
                         </View>
                       </View>
                       <ChevronRight size={18} color="#A8A29E" className="mt-1 mr-1" />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-stone-400"
-                        onClick={() => handleDeleteSubtopic(sub.id)}
-                      >
-                        <Trash2 size={16} color="#B45309" />
-                      </Button>
+                      {editMode && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-stone-400"
+                          onClick={() => handleDeleteSubtopic(sub.id)}
+                        >
+                          <Trash2 size={16} color="#B45309" />
+                        </Button>
+                      )}
                     </View>
                   </CardContent>
                 </Card>

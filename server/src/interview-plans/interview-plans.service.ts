@@ -13,6 +13,10 @@ export class InterviewPlansService {
     return this.plannerSkill.refine(planId, feedback);
   }
 
+  async supplement(planId: string, requirements?: string, existingCount?: number) {
+    return this.plannerSkill.supplement(planId, requirements, existingCount);
+  }
+
   async finalize(planId: string) {
     return this.plannerSkill.finalize(planId);
   }

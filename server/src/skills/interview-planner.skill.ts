@@ -601,4 +601,113 @@ ${feedback}
       },
     };
   }
+
+  /**
+   * 补充备选问题
+   */
+  async supplement(planId: string, requirements?: string, existingCount?: number) {
+    const { data: existingPlan, error: planError } = await this.client
+      .from('interview_plans')
+      .select('*')
+      .eq('id', planId)
+      .single();
+
+    if (planError || !existingPlan) throw new Error('策划不存在');
+
+    const context = await this.collectContext(existingPlan.topic_id);
+    const newQuestions = await this.generateSupplementQuestions(context, existingPlan, requirements, existingCount);
+
+    return {
+      core_questions: newQuestions,
+    };
+  }
+
+  /**
+   * 调用 LLM 生成补充问题
+   */
+  private async generateSupplementQuestions(
+    context: Awaited<ReturnType<InterviewPlannerSkill['collectContext']>>,
+    existingPlan: Record<string, unknown>,
+    requirements?: string,
+    existingCount?: number,
+  ) {
+    const { topic } = context;
+
+    const tipsData = existingPlan.tips as Record<string, unknown> | null;
+    const existingCoreQuestions = (tipsData?.core_questions as unknown[]) || [];
+
+    const existingQuestionsInfo = existingCoreQuestions
+      .map((q: Record<string, unknown>, i: number) => {
+        return `${i + 1}. [${q.dimension || ''}] ${q.child_version || ''}`;
+      })
+      .join('\n');
+
+    const systemPrompt = `你叫"村庄记忆"的采访策划师。用户已经有一版采访策划，现在需要补充更多备选问题。
+
+## 最重要的原则：问题要「指着东西问」
+
+问题必须基于**具体的、可见的、可感知的**事物来提问。像孩子站在现场，用手指着一个东西问老人。
+- ✅ "屋顶那几个金木水火土是什么意思呀？"
+- ✅ "墙上这些画是谁画的？画的是什么故事？"
+- ✅ "这个水滴兽是干什么用的？"
+- ❌ "请介绍一下宗祠的历史和建筑特色"
+- ❌ "这个建筑有什么文化价值？"
+
+child_version 必须口语化、具体、有画面感。禁止"请介绍"、"请谈谈"等书面表达。
+
+## 补充问题要求
+1. 新生成的问题不能与已有问题重复
+2. 可以尝试从不同维度切入，或者对已有维度深挖
+3. 生成 3-5 个补充问题
+4. 每个问题必须包含完整的结构
+
+请严格按以下JSON格式返回，不要有任何其他内容：
+{
+  "core_questions": [
+    {
+      "dimension": "🌱 起源",
+      "dimension_key": "origin",
+      "adult_version": "大人版",
+      "child_version": "小孩版",
+      "why_ask": "为什么问",
+      "follow_up": "追问方向"
+    }
+  ]
+}`;
+
+    const userPrompt = `## 话题信息
+话题名称：${topic.name}
+${topic.description ? `话题描述：${topic.description}` : ''}
+
+## 已有核心问题（共 ${existingCount || existingCoreQuestions.length} 个）
+${existingQuestionsInfo || '暂无'}
+
+${requirements ? `## 用户补充要求\n${requirements}\n` : ''}
+请为这个话题补充 3-5 个备选问题。注意：
+1. 不要与已有问题重复
+2. 问题要口语化、具体、有画面感
+3. 可以尝试不同维度或深挖已有维度
+${requirements ? '4. **必须优先满足用户的补充要求**' : ''}`;
+
+    const llmClient = this.getLLMClient();
+    const response = await llmClient.invoke(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      { temperature: 0.8 },
+    );
+
+    try {
+      const content = response.content.trim();
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return parsed.core_questions || [];
+      }
+      throw new Error('无法提取 JSON');
+    } catch {
+      return [];
+    }
+  }
 }

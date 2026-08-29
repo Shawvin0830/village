@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Network } from '@/network'
-import { BookOpen, RefreshCw, FileText, FolderOpen, Search, Globe, ChevronDown, ChevronUp, FileSearch, BookOpenCheck, Save, Send, MessageCircle, ChevronRight } from 'lucide-react-taro'
+import { BookOpen, RefreshCw, FileText, FolderOpen, Search, Globe, ChevronDown, ChevronUp, FileSearch, BookOpenCheck, Save, Send, MessageCircle, ChevronRight, CirclePlus } from 'lucide-react-taro'
 
 interface CoreQuestion {
   dimension: string
@@ -134,6 +135,12 @@ const InterviewPlanPage = () => {
   const [selectedSubtopicId, setSelectedSubtopicId] = useState<string>('')
   const [generateRequirements, setGenerateRequirements] = useState('')
   const [subtopics, setSubtopics] = useState<Subtopic[]>([])
+
+  // 问题选择状态
+  const [selectedQuestions, setSelectedQuestions] = useState<Set<number>>(new Set())
+  const [showSupplementDialog, setShowSupplementDialog] = useState(false)
+  const [supplementRequirements, setSupplementRequirements] = useState('')
+  const [supplementing, setSupplementing] = useState(false)
 
   // 加载话题名称、资料列表、已有策划和子话题
   useEffect(() => {
@@ -419,6 +426,62 @@ const InterviewPlanPage = () => {
       Taro.showToast({ title: '更新失败，请重试', icon: 'none' })
     } finally {
       setRefining(false)
+    }
+  }
+
+  // 补充问题
+  const handleSupplement = async () => {
+    if (!plan?.id) return
+    try {
+      setSupplementing(true)
+      const res = await Network.request({
+        url: `/api/interview-plans/${plan.id}/supplement`,
+        method: 'POST',
+        data: {
+          requirements: supplementRequirements.trim() || undefined,
+          existing_count: plan.core_questions?.length || 0,
+        },
+      })
+      console.log('Supplement response:', res.data)
+      const data = res.data?.data
+      if (data && data.core_questions) {
+        // 将新问题追加到现有问题列表
+        setPlan(prev => prev ? {
+          ...prev,
+          core_questions: [...(prev.core_questions || []), ...data.core_questions],
+        } : null)
+        setShowSupplementDialog(false)
+        setSupplementRequirements('')
+        Taro.showToast({ title: `已补充 ${data.core_questions.length} 个问题`, icon: 'success' })
+      }
+    } catch (err) {
+      console.error('补充问题失败:', err)
+      Taro.showToast({ title: '补充失败，请重试', icon: 'none' })
+    } finally {
+      setSupplementing(false)
+    }
+  }
+
+  // 切换问题选择状态
+  const toggleQuestionSelection = (index: number) => {
+    setSelectedQuestions(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(index)) {
+        newSet.delete(index)
+      } else {
+        newSet.add(index)
+      }
+      return newSet
+    })
+  }
+
+  // 全选/取消全选
+  const toggleSelectAll = () => {
+    if (!plan?.core_questions) return
+    if (selectedQuestions.size === plan.core_questions.length) {
+      setSelectedQuestions(new Set())
+    } else {
+      setSelectedQuestions(new Set(plan.core_questions.map((_, i) => i)))
     }
   }
 
@@ -955,38 +1018,71 @@ const InterviewPlanPage = () => {
 
               {plan.core_questions && plan.core_questions.length > 0 && (
                 <View className="mb-5">
-                  <Text className="block text-sm font-semibold text-stone-700 mb-3">核心问题</Text>
+                  <View className="flex items-center justify-between mb-3">
+                    <Text className="block text-sm font-semibold text-stone-700">核心问题</Text>
+                    <View
+                      className="flex items-center gap-1"
+                      onClick={toggleSelectAll}
+                    >
+                      <Checkbox
+                        checked={selectedQuestions.size === plan.core_questions.length}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                      <Text className="block text-xs text-stone-500">
+                        {selectedQuestions.size === plan.core_questions.length ? '取消全选' : '全选'}
+                      </Text>
+                    </View>
+                  </View>
                   <View className="space-y-3">
                     {plan.core_questions.map((q, i) => (
-                      <View key={i} className="pl-3 border-l-2 border-stone-200">
-                        <View className="mb-1">
-                          <Text className="block text-sm text-stone-800">{q.child_version}</Text>
+                      <View key={i} className="flex items-start gap-2">
+                        <View className="pt-1">
+                          <Checkbox
+                            checked={selectedQuestions.has(i)}
+                            onCheckedChange={() => toggleQuestionSelection(i)}
+                          />
                         </View>
-                        {q.why_ask && (
-                          <View
-                            className="flex items-center gap-1"
-                            onClick={() => setExpandedIntent(expandedIntent === i ? null : i)}
-                          >
-                            <Text className="block text-xs text-stone-400">意图</Text>
-                            {expandedIntent === i ? <ChevronUp size={12} color="#9CA3AF" /> : <ChevronDown size={12} color="#9CA3AF" />}
+                        <View className="flex-1 pl-3 border-l-2 border-stone-200">
+                          <View className="mb-1">
+                            <Text className="block text-sm text-stone-800">{q.child_version}</Text>
                           </View>
-                        )}
-                        {q.why_ask && expandedIntent === i && (
-                          <View className="mt-1">
-                            <Text className="block text-xs text-stone-400">
-                              {q.why_ask}
-                            </Text>
-                          </View>
-                        )}
-                        {q.follow_up && (
-                          <View className="mt-1">
-                            <Text className="block text-xs text-stone-400">
-                              追问：{q.follow_up}
-                            </Text>
-                          </View>
-                        )}
+                          {q.why_ask && (
+                            <View
+                              className="flex items-center gap-1"
+                              onClick={() => setExpandedIntent(expandedIntent === i ? null : i)}
+                            >
+                              <Text className="block text-xs text-stone-400">意图</Text>
+                              {expandedIntent === i ? <ChevronUp size={12} color="#9CA3AF" /> : <ChevronDown size={12} color="#9CA3AF" />}
+                            </View>
+                          )}
+                          {q.why_ask && expandedIntent === i && (
+                            <View className="mt-1">
+                              <Text className="block text-xs text-stone-400">
+                                {q.why_ask}
+                              </Text>
+                            </View>
+                          )}
+                          {q.follow_up && (
+                            <View className="mt-1">
+                              <Text className="block text-xs text-stone-400">
+                                追问：{q.follow_up}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
                       </View>
                     ))}
+                  </View>
+                  {/* 补充问题按钮 */}
+                  <View className="mt-4">
+                    <Button
+                      variant="outline"
+                      className="w-full border-stone-200 text-stone-600"
+                      onClick={() => setShowSupplementDialog(true)}
+                    >
+                      <CirclePlus size={16} color="#78716C" className="mr-2" />
+                      <Text className="text-sm">补充备选问题</Text>
+                    </Button>
                   </View>
                 </View>
               )}
@@ -1105,6 +1201,80 @@ const InterviewPlanPage = () => {
                   disabled={generating}
                 >
                   <Text>{generating ? 'AI 正在思考...' : '开始生成'}</Text>
+                </Button>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* 补充问题弹窗 */}
+      {showSupplementDialog && (
+        <View
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => setShowSupplementDialog(false)}
+        >
+          <View
+            className="bg-white rounded-2xl w-11/12 max-h-4/5 overflow-auto"
+            style={{ padding: '20px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Text className="block text-lg font-bold text-stone-800 mb-2">
+              补充备选问题
+            </Text>
+            <Text className="block text-sm text-stone-500 mb-4">
+              告诉 AI 你需要什么类型的问题，它会为你补充更多备选
+            </Text>
+
+            <View className="mb-4">
+              <Text className="block text-sm font-medium text-stone-700 mb-2">
+                补充要求（可选）
+              </Text>
+              <Text className="block text-xs text-stone-400 mb-2">
+                比如：需要更多关于XX方面的问题、想要更简单易懂的问题等
+              </Text>
+              <View className="bg-stone-50 rounded-xl" style={{ padding: '12px' }}>
+                <Textarea
+                  style={{ width: '100%', minHeight: '100px', backgroundColor: 'transparent' }}
+                  placeholder="描述你需要什么样的问题..."
+                  value={supplementRequirements}
+                  onInput={(e) => setSupplementRequirements(e.detail.value)}
+                  maxlength={500}
+                />
+              </View>
+            </View>
+
+            <View style={{ display: 'flex', gap: '12px' }}>
+              <View style={{ flex: 1 }}>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setShowSupplementDialog(false)
+                    setSupplementRequirements('')
+                  }}
+                >
+                  <Text>取消</Text>
+                </Button>
+              </View>
+              <View style={{ flex: 2 }}>
+                <Button
+                  className="w-full bg-amber-700 hover:bg-amber-800 text-white"
+                  onClick={handleSupplement}
+                  disabled={supplementing}
+                >
+                  <Text>{supplementing ? 'AI 正在生成...' : '开始补充'}</Text>
                 </Button>
               </View>
             </View>

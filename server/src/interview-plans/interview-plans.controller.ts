@@ -19,6 +19,13 @@ export class InterviewPlansController {
     return { code: 200, msg: 'success', data };
   }
 
+  @Post(':planId/supplement')
+  @HttpCode(200)
+  async supplement(@Param('planId') planId: string, @Body() body: { requirements?: string; existing_count?: number }) {
+    const data = await this.plansService.supplement(planId, body.requirements, body.existing_count);
+    return { code: 200, msg: 'success', data };
+  }
+
   @Post(':planId/finalize')
   @HttpCode(200)
   async finalize(@Param('planId') planId: string) {
