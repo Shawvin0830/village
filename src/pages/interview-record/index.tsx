@@ -428,7 +428,7 @@ const InterviewRecordPage = () => {
 
                       {/* 完整度 */}
                       <View className="flex items-center gap-2 mb-3">
-                        <View className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
+                        <View className="flex-1 h-2 bg-stone-100 rounded-full overflow-hidden">
                           <View
                             className={`h-full rounded-full ${getCompletenessBarColor(narr.completeness)}`}
                             style={{ width: `${narr.completeness}%` }}
@@ -458,7 +458,7 @@ const InterviewRecordPage = () => {
                         <View className="bg-purple-50 rounded-lg px-3 py-2 mb-3 border-l-2 border-purple-300">
                           <Text className="block text-xs text-purple-400 mb-1">最动人的话</Text>
                           <Text className="block text-sm text-purple-700 italic">
-                            "{narr.key_quote}"
+                            &ldquo;{narr.key_quote}&rdquo;
                           </Text>
                         </View>
                       )}
@@ -608,7 +608,7 @@ const InterviewRecordPage = () => {
                       <View className="bg-purple-50 rounded-lg px-3 py-2 border-l-2 border-purple-300">
                         {char.key_quotes.map((q, j) => (
                           <Text key={j} className="block text-sm text-purple-700 italic mb-1">
-                            "{q}"
+                            &ldquo;{q}&rdquo;
                           </Text>
                         ))}
                       </View>

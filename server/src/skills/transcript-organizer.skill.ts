@@ -19,7 +19,7 @@ import * as fs from 'fs';
 // ─── 故事分类枚举 ────────────────────────────────────────
 
 /** 故事类型 */
-type StoryCategory =
+export type StoryCategory =
   | 'building_history'    // 建筑史：祠堂建造、修缮、损毁、扩建
   | 'craft_culture'       // 工艺文化：木雕/石雕/砖雕/彩绘的技法、流派、材料
   | 'iconography'         // 图像寓意：壁画/雕刻/装饰图案的文化含义（如八仙过海、麒麟送子）
@@ -39,7 +39,7 @@ const CATEGORY_META: Record<StoryCategory, { label: string; icon: string; descri
 // ─── 类型定义 ───────────────────────────────────────────
 
 /** 单个故事片段（一次采访中识别出的一段内容） */
-interface StoryFragment {
+export interface StoryFragment {
   story_thread_id: string | null;  // 匹配到的已有故事线ID（新故事线为null）
   story_thread_name: string;       // 故事线名称（如"藻井木雕的前世今生""八仙过海壁画"）
   category: StoryCategory;         // 故事分类
@@ -52,7 +52,7 @@ interface StoryFragment {
 }
 
 /** 导览叙事：每条故事线的可读版本 */
-interface GuidedNarrative {
+export interface GuidedNarrative {
   story_thread_name: string;       // 故事线名称
   category: StoryCategory;
   narrative: string;               // 导览文字（200-500字，有节奏、有细节、有温度）
@@ -63,7 +63,7 @@ interface GuidedNarrative {
 }
 
 /** 时间线事件 */
-interface TimelineEvent {
+export interface TimelineEvent {
   period: string;
   events: string[];
   related_people: string[];
@@ -72,7 +72,7 @@ interface TimelineEvent {
 }
 
 /** 人物档案 */
-interface Character {
+export interface Character {
   name: string;
   aliases: string[];
   tags: string[];
@@ -84,7 +84,7 @@ interface Character {
 }
 
 /** 人物关系 */
-interface Relationship {
+export interface Relationship {
   from: string;
   to: string;
   type: string;
@@ -93,7 +93,7 @@ interface Relationship {
 }
 
 /** 完整整理结果 */
-interface OrganizeResult {
+export interface OrganizeResult {
   fragments: StoryFragment[];         // 原始片段（替代之前的 segments）
   narratives: GuidedNarrative[];      // 导览叙事（v3 新增）
   timeline: TimelineEvent[];
