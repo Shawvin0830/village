@@ -9,12 +9,12 @@ export class InterviewRecordsService {
     return this.organizerSkill.uploadAudio(file);
   }
 
-  async transcribe(topicId: string, audioKey: string, subtopicId?: string) {
-    return this.organizerSkill.transcribe(topicId, audioKey, subtopicId);
+  async transcribe(topicId: string, audioKey: string, subtopicId?: string, intervieweeName?: string) {
+    return this.organizerSkill.transcribe(topicId, audioKey, subtopicId, intervieweeName);
   }
 
-  async transcribeText(topicId: string, text: string, subtopicId?: string) {
-    return this.organizerSkill.transcribeText(topicId, text, subtopicId);
+  async transcribeText(topicId: string, text: string, subtopicId?: string, intervieweeName?: string) {
+    return this.organizerSkill.transcribeText(topicId, text, subtopicId, intervieweeName);
   }
 
   async getByTopic(topicId: string) {
@@ -42,5 +42,25 @@ export class InterviewRecordsService {
     meta?: { title?: string; subtitle?: string; note?: string },
   ) {
     return this.organizerSkill.renderTopicArchive(topicId, meta);
+  }
+
+  /** 确认采访记录（归入资料库） */
+  async confirmRecord(recordId: string) {
+    return this.organizerSkill.confirmRecord(recordId);
+  }
+
+  /** 驳回采访记录 */
+  async rejectRecord(recordId: string) {
+    return this.organizerSkill.rejectRecord(recordId);
+  }
+
+  /** 文档上传 + 解析 + 整理 */
+  async uploadAndParseDocument(
+    file: Express.Multer.File,
+    topicId: string,
+    subtopicId?: string,
+    intervieweeName?: string,
+  ) {
+    return this.organizerSkill.uploadAndParseDocument(file, topicId, subtopicId, intervieweeName);
   }
 }

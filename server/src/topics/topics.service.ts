@@ -17,17 +17,33 @@ export class TopicsService {
       .order('created_at', { ascending: false });
     if (error) throw new Error(`查询话题列表失败: ${error.message}`);
 
-    const topicsWithCount = await Promise.all(
+    const topicsWithDetails = await Promise.all(
       (data || []).map(async (topic) => {
-        const { count } = await this.client
+        const { data: subtopics, count } = await this.client
           .from('subtopics')
-          .select('*', { count: 'exact', head: true })
-          .eq('topic_id', topic.id);
-        return { ...topic, subtopic_count: count || 0 };
+          .select('id, name, icon, transcript_status, verify_status, auth_level', { count: 'exact' })
+          .eq('topic_id', topic.id)
+          .order('created_at', { ascending: true });
+        
+        // 检查是否有采访策划
+        const { data: plans } = await this.client
+          .from('interview_plans')
+          .select('id')
+          .eq('topic_id', topic.id)
+          .limit(1);
+        
+        const hasPlan = plans && plans.length > 0;
+        
+        return { 
+          ...topic, 
+          subtopic_count: count || 0,
+          subtopics: subtopics || [],
+          has_interview_plan: hasPlan,
+        };
       }),
     );
 
-    return topicsWithCount;
+    return topicsWithDetails;
   }
 
   async findOne(id: string) {

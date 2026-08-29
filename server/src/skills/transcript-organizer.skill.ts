@@ -12,7 +12,7 @@
  * 5. 方言保留 + 普通话转写 + 待核实标记 + 人物/时间线/关系图谱
  */
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { ASRClient, LLMClient, Config, S3Storage } from 'coze-coding-dev-sdk';
+import { ASRClient, LLMClient, Config, S3Storage, FetchClient } from 'coze-coding-dev-sdk';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import * as fs from 'fs';
 
@@ -636,7 +636,7 @@ export class TranscriptOrganizerSkill {
 
   // ─── ASR 转写 + 智能整理 ─────────────────────────────
 
-  async transcribe(topicId: string, audioKey: string, subtopicId?: string) {
+  async transcribe(topicId: string, audioKey: string, subtopicId?: string, intervieweeName?: string) {
     const storage = this.getStorage();
     const audioUrl = await storage.generatePresignedUrl({ key: audioKey, expireTime: 3600 });
 
@@ -659,6 +659,7 @@ export class TranscriptOrganizerSkill {
       audioKey,
       text: transcript,
       analysis,
+      intervieweeName,
     });
 
     return this.formatResult(transcript, analysis);
@@ -666,13 +667,14 @@ export class TranscriptOrganizerSkill {
 
   // ─── 文本直接整理（跳过 ASR）─────────────────────────
 
-  async transcribeText(topicId: string, text: string, subtopicId?: string) {
+  async transcribeText(topicId: string, text: string, subtopicId?: string, intervieweeName?: string) {
     const analysis = await this.organizeTranscript(topicId, text, { hasAudio: false });
 
     await this.saveRecordAndUpdateStoryThreads(topicId, {
       subtopicId,
       text,
       analysis,
+      intervieweeName,
     });
 
     return this.formatResult(text, analysis);
@@ -750,6 +752,123 @@ export class TranscriptOrganizerSkill {
     return data || [];
   }
 
+  // ─── 确认采访记录（归入资料库）─────────────────────────
+
+  async confirmRecord(recordId: string) {
+    const { data, error } = await this.client
+      .from('interview_records')
+      .update({ confirm_status: 'confirmed' })
+      .eq('id', recordId)
+      .select()
+      .single();
+    if (error) throw new Error(`确认记录失败: ${error.message}`);
+    return data;
+  }
+
+  // ─── 驳回采访记录 ────────────────────────────────────
+
+  async rejectRecord(recordId: string) {
+    const { data, error } = await this.client
+      .from('interview_records')
+      .update({ confirm_status: 'rejected' })
+      .eq('id', recordId)
+      .select()
+      .single();
+    if (error) throw new Error(`驳回记录失败: ${error.message}`);
+    return data;
+  }
+
+  // ─── 文档上传 + 解析 + 整理 ──────────────────────────
+
+  /**
+   * 上传文档（PDF/Word/TXT 等）到对象存储，解析出文本，然后走整理流程。
+   */
+  async uploadAndParseDocument(
+    file: Express.Multer.File,
+    topicId: string,
+    subtopicId?: string,
+    intervieweeName?: string,
+  ) {
+    if (!file) throw new BadRequestException('未收到文档文件');
+
+    // 1. 上传文档到对象存储
+    const storage = this.getStorage();
+    let fileBuffer: Buffer;
+    if (file.path) {
+      fileBuffer = await fs.promises.readFile(file.path);
+    } else if (file.buffer) {
+      fileBuffer = file.buffer;
+    } else {
+      throw new BadRequestException('无法获取文件内容');
+    }
+
+    const ext = (file.originalname || 'document.txt').split('.').pop()?.toLowerCase() || 'txt';
+    const fileName = `documents/${Date.now()}_${file.originalname || 'document'}`;
+    const docKey = await storage.uploadFile({
+      fileContent: fileBuffer,
+      fileName,
+      contentType: file.mimetype || this.getMimeType(ext),
+    });
+
+    // 2. 生成预签名 URL 用于解析
+    const docUrl = await storage.generatePresignedUrl({ key: docKey, expireTime: 3600 });
+
+    // 3. 使用 FetchClient 解析文档内容
+    let extractedText = '';
+    try {
+      const fetchClient = new FetchClient(new Config());
+      const response = await fetchClient.fetch(docUrl);
+
+      if (response.status_code !== 0) {
+        throw new Error(`文档解析失败: ${response.status_message || '未知错误'}`);
+      }
+
+      // 提取所有文本内容
+      extractedText = response.content
+        .filter((item) => item.type === 'text')
+        .map((item) => item.text)
+        .join('\n');
+
+      if (!extractedText) {
+        throw new BadRequestException('文档中未提取到有效文本内容');
+      }
+    } catch (err) {
+      console.error('文档解析失败:', err);
+      throw new BadRequestException('文档解析失败，请确认文件格式正确（支持 PDF/Word/TXT）');
+    }
+
+    // 4. 走整理流程
+    const analysis = await this.organizeTranscript(topicId, extractedText, { hasAudio: false });
+
+    await this.saveRecordAndUpdateStoryThreads(topicId, {
+      subtopicId,
+      audioKey: docKey,
+      text: extractedText,
+      analysis,
+      intervieweeName,
+    });
+
+    return {
+      ...this.formatResult(extractedText, analysis),
+      document_key: docKey,
+      document_name: file.originalname,
+    };
+  }
+
+  /** 根据扩展名推断 MIME 类型 */
+  private getMimeType(ext: string): string {
+    const map: Record<string, string> = {
+      pdf: 'application/pdf',
+      doc: 'application/msword',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      txt: 'text/plain',
+      csv: 'text/csv',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    };
+    return map[ext] || 'application/octet-stream';
+  }
+
   // ═══════════════════════════════════════════════════════
   //  私有方法
   // ═══════════════════════════════════════════════════════
@@ -764,9 +883,10 @@ export class TranscriptOrganizerSkill {
       audioKey?: string;
       text: string;
       analysis: OrganizeResult;
+      intervieweeName?: string;
     },
   ) {
-    const { subtopicId, audioKey, text, analysis } = opts;
+    const { subtopicId, audioKey, text, analysis, intervieweeName } = opts;
 
     const { error } = await this.client
       .from('interview_records')
@@ -778,6 +898,8 @@ export class TranscriptOrganizerSkill {
         dialect_original: analysis.fragments.map((s) => s.dialect_original).join('\n\n') || text,
         mandarin_text: analysis.fragments.map((s) => s.mandarin_text).join('\n\n') || text,
         status: 'completed',
+        confirm_status: 'pending',
+        interviewee_name: intervieweeName || null,
         ai_analysis: analysis,
       })
       .select()
