@@ -125,6 +125,8 @@ const InterviewPlanPage = () => {
   const [showContext, setShowContext] = useState(false)
   const [showDimensions, setShowDimensions] = useState(false)
   const [expandedIntent, setExpandedIntent] = useState<number | null>(null)
+  const [expandedFollowUp, setExpandedFollowUp] = useState<number | null>(null)
+  const [selectionConfirmed, setSelectionConfirmed] = useState(false)
 
   // 讨论调整状态
   const [feedback, setFeedback] = useState('')
@@ -483,6 +485,17 @@ const InterviewPlanPage = () => {
     } else {
       setSelectedQuestions(new Set(plan.core_questions.map((_, i) => i)))
     }
+    setSelectionConfirmed(false)
+  }
+
+  // 确认选择
+  const confirmSelection = () => {
+    if (selectedQuestions.size === 0) {
+      Taro.showToast({ title: '请至少选择一个问题', icon: 'none' })
+      return
+    }
+    setSelectionConfirmed(true)
+    Taro.showToast({ title: `已选择 ${selectedQuestions.size} 个问题`, icon: 'success' })
   }
 
   const switchVersion = (version: InterviewPlan) => {
@@ -1039,22 +1052,36 @@ const InterviewPlanPage = () => {
                         <View className="pt-1">
                           <Checkbox
                             checked={selectedQuestions.has(i)}
-                            onCheckedChange={() => toggleQuestionSelection(i)}
+                            onCheckedChange={() => {
+                              toggleQuestionSelection(i)
+                              setSelectionConfirmed(false)
+                            }}
                           />
                         </View>
                         <View className="flex-1 pl-3 border-l-2 border-stone-200">
                           <View className="mb-1">
                             <Text className="block text-sm text-stone-800">{q.child_version}</Text>
                           </View>
-                          {q.why_ask && (
-                            <View
-                              className="flex items-center gap-1"
-                              onClick={() => setExpandedIntent(expandedIntent === i ? null : i)}
-                            >
-                              <Text className="block text-xs text-stone-400">意图</Text>
-                              {expandedIntent === i ? <ChevronUp size={12} color="#9CA3AF" /> : <ChevronDown size={12} color="#9CA3AF" />}
-                            </View>
-                          )}
+                          <View className="flex items-center gap-3 mt-1">
+                            {q.why_ask && (
+                              <View
+                                className="flex items-center gap-1"
+                                onClick={() => setExpandedIntent(expandedIntent === i ? null : i)}
+                              >
+                                <Text className="block text-xs text-stone-400">意图</Text>
+                                {expandedIntent === i ? <ChevronUp size={12} color="#9CA3AF" /> : <ChevronDown size={12} color="#9CA3AF" />}
+                              </View>
+                            )}
+                            {q.follow_up && (
+                              <View
+                                className="flex items-center gap-1"
+                                onClick={() => setExpandedFollowUp(expandedFollowUp === i ? null : i)}
+                              >
+                                <Text className="block text-xs text-stone-400">追问</Text>
+                                {expandedFollowUp === i ? <ChevronUp size={12} color="#9CA3AF" /> : <ChevronDown size={12} color="#9CA3AF" />}
+                              </View>
+                            )}
+                          </View>
                           {q.why_ask && expandedIntent === i && (
                             <View className="mt-1">
                               <Text className="block text-xs text-stone-400">
@@ -1062,10 +1089,10 @@ const InterviewPlanPage = () => {
                               </Text>
                             </View>
                           )}
-                          {q.follow_up && (
+                          {q.follow_up && expandedFollowUp === i && (
                             <View className="mt-1">
                               <Text className="block text-xs text-stone-400">
-                                追问：{q.follow_up}
+                                {q.follow_up}
                               </Text>
                             </View>
                           )}
@@ -1073,6 +1100,32 @@ const InterviewPlanPage = () => {
                       </View>
                     ))}
                   </View>
+                  {/* 确认选择按钮 */}
+                  {selectedQuestions.size > 0 && !selectionConfirmed && (
+                    <View className="mt-4">
+                      <Button
+                        className="w-full bg-amber-700 hover:bg-amber-800 text-white"
+                        onClick={confirmSelection}
+                      >
+                        <Text className="text-sm">确认选择 {selectedQuestions.size} 个问题</Text>
+                      </Button>
+                    </View>
+                  )}
+                  {selectionConfirmed && (
+                    <View className="mt-4 p-3 bg-green-50 rounded-lg flex items-center justify-between">
+                      <Text className="block text-sm text-green-700">
+                        已选择 {selectedQuestions.size} 个问题
+                      </Text>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-stone-200"
+                        onClick={() => setSelectionConfirmed(false)}
+                      >
+                        <Text className="text-xs">重新选择</Text>
+                      </Button>
+                    </View>
+                  )}
                   {/* 补充问题按钮 */}
                   <View className="mt-4">
                     <Button

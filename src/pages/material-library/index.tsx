@@ -1,6 +1,6 @@
 import { View, Text, ScrollView } from '@tarojs/components'
 import { useState, useCallback, useRef } from 'react'
-import Taro, { useLoad, useRouter } from '@tarojs/taro'
+import Taro, { useLoad, useRouter, useDidShow } from '@tarojs/taro'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -32,7 +32,8 @@ const SOURCE_LABEL: Record<string, string> = {
 const MaterialLibraryPage = () => {
   const router = useRouter()
   const topicId = router.params.topicId || ''
-  const topicName = router.params.topicName || '资料库'
+  const topicName = router.params.topicName || ''
+  const isGlobalMode = !topicId
 
   const [materials, setMaterials] = useState<Material[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,10 +51,12 @@ const MaterialLibraryPage = () => {
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchMaterials = useCallback(async () => {
-    if (!topicId) return
     try {
       setLoading(true)
-      const res = await Network.request({ url: `/api/materials/topic/${topicId}` })
+      const url = topicId
+        ? `/api/materials/topic/${topicId}`
+        : '/api/materials'
+      const res = await Network.request({ url })
       const data = res.data?.data
       if (Array.isArray(data)) {
         setMaterials(data)
@@ -69,7 +72,12 @@ const MaterialLibraryPage = () => {
     fetchMaterials()
   })
 
-  /** 语义搜索（防抖） */
+  useDidShow(() => {
+    if (!isGlobalMode) return
+    fetchMaterials()
+  })
+
+  /** 搜索（防抖） */
   const handleSearch = useCallback(
     (query: string) => {
       setSearchQuery(query)
@@ -85,15 +93,28 @@ const MaterialLibraryPage = () => {
         try {
           setSearching(true)
           setIsSearchMode(true)
-          const searchRes = await Network.request({
-            url: `/api/materials/topic/${topicId}/search?q=${encodeURIComponent(query.trim())}`,
-          })
-          const results = searchRes.data?.data
-          if (Array.isArray(results)) {
-            setMaterials(results)
+
+          if (topicId) {
+            // 话题内语义搜索
+            const searchRes = await Network.request({
+              url: `/api/materials/topic/${topicId}/search?q=${encodeURIComponent(query.trim())}`,
+            })
+            const results = searchRes.data?.data
+            if (Array.isArray(results)) {
+              setMaterials(results)
+            }
+          } else {
+            // 全局关键词搜索
+            const searchRes = await Network.request({
+              url: `/api/materials/search?q=${encodeURIComponent(query.trim())}`,
+            })
+            const results = searchRes.data?.data
+            if (Array.isArray(results)) {
+              setMaterials(results)
+            }
           }
         } catch (err) {
-          console.error('语义搜索失败:', err)
+          console.error('搜索失败:', err)
         } finally {
           setSearching(false)
         }
@@ -111,6 +132,10 @@ const MaterialLibraryPage = () => {
   const handleAddMaterial = async () => {
     if (!newTitle.trim() || !newContent.trim()) {
       Taro.showToast({ title: '请填写标题和内容', icon: 'none' })
+      return
+    }
+    if (!topicId) {
+      Taro.showToast({ title: '请先选择话题后再添加资料', icon: 'none' })
       return
     }
     try {
@@ -174,7 +199,7 @@ const MaterialLibraryPage = () => {
             <View style={{ flex: 1, marginLeft: '8px' }}>
               <Input
                 className="w-full bg-transparent"
-                placeholder="搜索资料... 支持自然语言"
+                placeholder={isGlobalMode ? '搜索资料库...' : '搜索资料... 支持自然语言'}
                 value={searchQuery}
                 onInput={(e) => handleSearch(e.detail.value)}
                 confirmType="search"
@@ -186,12 +211,14 @@ const MaterialLibraryPage = () => {
               </Button>
             )}
           </View>
-          <Button
-            className="h-10 w-10 p-0 bg-amber-700"
-            onClick={() => setShowAddDialog(true)}
-          >
-            <Plus size={20} color="#ffffff" />
-          </Button>
+          {topicId && (
+            <Button
+              className="h-10 w-10 p-0 bg-amber-700"
+              onClick={() => setShowAddDialog(true)}
+            >
+              <Plus size={20} color="#ffffff" />
+            </Button>
+          )}
         </View>
       </View>
 
@@ -200,7 +227,9 @@ const MaterialLibraryPage = () => {
         <View className="px-4 py-2">
           <View className="flex items-center gap-2">
             <Sparkles size={14} color="#B45309" />
-            <Text className="text-xs text-amber-700">AI 语义检索中...</Text>
+            <Text className="text-xs text-amber-700">
+              {isGlobalMode ? '关键词检索中...' : 'AI 语义检索中...'}
+            </Text>
           </View>
         </View>
       )}
@@ -227,7 +256,11 @@ const MaterialLibraryPage = () => {
             <CardContent className="p-8 flex flex-col items-center">
               <BookOpen size={40} color="#D6D3D1" />
               <Text className="block text-sm text-stone-500 text-center mt-4">
-                {isSearchMode ? '没有找到相关资料\n换个关键词试试' : '还没有资料\n点击右下角 + 添加第一条'}
+                {isSearchMode
+                  ? '没有找到相关资料\n换个关键词试试'
+                  : isGlobalMode
+                    ? '资料库还没有内容\n在话题中采访后会沉淀相关资料'
+                    : '还没有资料\n点击右下角 + 添加第一条'}
               </Text>
             </CardContent>
           </Card>
@@ -275,7 +308,7 @@ const MaterialLibraryPage = () => {
         )}
       </View>
 
-      {/* 新增资料弹窗 */}
+      {/* 新增资料弹窗（仅话题模式下可用） */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="bg-white">
           <DialogHeader>
@@ -283,7 +316,7 @@ const MaterialLibraryPage = () => {
               <Text>添加资料</Text>
             </DialogTitle>
             <DialogDescription>
-              <Text>为「{decodeURIComponent(topicName)}」添加一条新资料</Text>
+              <Text>为「{decodeURIComponent(topicName || '话题')}」添加一条新资料</Text>
             </DialogDescription>
           </DialogHeader>
           <View className="space-y-4 mt-4">
