@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Network } from '@/network'
-import { Plus, BookOpen, Mic, ShieldCheck, Trash2, Library } from 'lucide-react-taro'
+import { Plus, BookOpen, Mic, ShieldCheck, Trash2, ChevronRight, Quote } from 'lucide-react-taro'
 
 interface Subtopic {
   id: string
@@ -113,6 +113,10 @@ const TopicDetailPage = () => {
     }
   }
 
+  const goToSubtopicMaterials = (subId: string) => {
+    Taro.navigateTo({ url: `/pages/subtopic-materials/index?topicId=${topicId}&subtopicId=${subId}` })
+  }
+
   if (loading) {
     return (
       <View className="min-h-screen bg-stone-50 px-4 pt-6">
@@ -144,21 +148,13 @@ const TopicDetailPage = () => {
 
       {/* 快捷操作 */}
       <View className="px-4 mb-4">
-        <View className="grid grid-cols-4 gap-3">
-          <Button
-            variant="outline"
-            className="flex flex-col items-center gap-1 h-auto py-3 border-stone-200 bg-white"
-            onClick={() => Taro.navigateTo({ url: `/pages/material-library/index?topicId=${topicId}&topicName=${encodeURIComponent(topic.name)}` })}
-          >
-            <Library size={20} color="#B45309" />
-            <Text className="text-xs text-stone-700">资料库</Text>
-          </Button>
+        <View className="grid grid-cols-3 gap-3">
           <Button
             variant="outline"
             className="flex flex-col items-center gap-1 h-auto py-3 border-stone-200 bg-white"
             onClick={() => Taro.navigateTo({ url: `/pages/interview-plan/index?topicId=${topicId}` })}
           >
-            <BookOpen size={20} color="#92400E" />
+            <BookOpen size={20} color="#B45309" />
             <Text className="text-xs text-stone-700">采访策划</Text>
           </Button>
           <Button
@@ -207,7 +203,10 @@ const TopicDetailPage = () => {
                 <Card key={sub.id} className="border-stone-100 shadow-sm bg-white">
                   <CardContent className="p-4">
                     <View className="flex items-start justify-between">
-                      <View className="flex items-start gap-2 flex-1">
+                      <View
+                        className="flex items-start gap-2 flex-1"
+                        onClick={() => goToSubtopicMaterials(sub.id)}
+                      >
                         <Text className="text-xl mt-1">{sub.icon}</Text>
                         <View className="flex-1">
                           <Text className="block text-sm font-semibold text-stone-800 mb-1">
@@ -255,8 +254,15 @@ const TopicDetailPage = () => {
                               </Text>
                             </Badge>
                           </View>
+                          <View className="flex items-center mt-3">
+                            <Quote size={14} color="#B45309" className="mr-1" />
+                            <Text className="text-xs text-amber-700">
+                              查看谁讲过这段
+                            </Text>
+                          </View>
                         </View>
                       </View>
+                      <ChevronRight size={18} color="#A8A29E" className="mt-1 mr-1" />
                       <Button
                         size="sm"
                         variant="ghost"

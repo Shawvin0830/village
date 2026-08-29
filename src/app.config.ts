@@ -4,6 +4,7 @@ export default defineAppConfig({
     'pages/topics/index',
     'pages/profile/index',
     'pages/topic-detail/index',
+    'pages/subtopic-materials/index',
     'pages/interview-plan/index',
     'pages/interview-record/index',
     'pages/authorization/index',

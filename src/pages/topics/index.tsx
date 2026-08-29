@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Network } from '@/network'
-import { Plus, ChevronRight } from 'lucide-react-taro'
+import { Plus, ChevronRight, Search, FileText, BookOpen } from 'lucide-react-taro'
 
 interface Topic {
   id: string
@@ -17,8 +17,12 @@ interface Topic {
   description: string | null
   status: string
   subtopic_count: number
+  interview_count?: number
+  reference_count?: number
   created_at: string
 }
+
+type SourceFilter = 'all' | 'interviews' | 'references'
 
 const TopicsPage = () => {
   const [topics, setTopics] = useState<Topic[]>([])
@@ -27,6 +31,8 @@ const TopicsPage = () => {
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
   const [creating, setCreating] = useState(false)
+  const [query, setQuery] = useState('')
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
 
   const fetchTopics = useCallback(async () => {
     try {
@@ -80,6 +86,17 @@ const TopicsPage = () => {
     Taro.navigateTo({ url: `/pages/topic-detail/index?id=${topicId}` })
   }
 
+  const filteredTopics = topics.filter((topic) => {
+    const keyword = query.trim()
+    const text = `${topic.name} ${topic.description || ''}`
+    const matchesQuery = !keyword || text.includes(keyword)
+    const matchesSource =
+      sourceFilter === 'all' ||
+      (sourceFilter === 'interviews' && (topic.interview_count || 0) > 0) ||
+      (sourceFilter === 'references' && (topic.reference_count || 0) > 0)
+    return matchesQuery && matchesSource
+  })
+
   return (
     <View className="min-h-screen bg-stone-50 pb-20">
       {/* 头部 */}
@@ -96,6 +113,40 @@ const TopicsPage = () => {
           <Plus size={16} color="#B45309" className="mr-1" />
           <Text>新建</Text>
         </Button>
+      </View>
+
+      {/* 搜索与材料入口 */}
+      <View className="px-4 mb-4">
+        <Card className="border-stone-100 bg-white">
+          <CardContent className="p-3">
+            <View className="flex items-center mb-3">
+              <Search size={16} color="#78716C" className="mr-2" />
+              <Input
+                value={query}
+                placeholder="搜索话题名称或描述"
+                onInput={(e) => setQuery(String(e.detail.value || ''))}
+              />
+            </View>
+            <View className="grid grid-cols-2 gap-2">
+              <Button
+                variant={sourceFilter === 'interviews' ? 'default' : 'outline'}
+                className={sourceFilter === 'interviews' ? 'bg-amber-700 text-white' : 'bg-white'}
+                onClick={() => setSourceFilter(sourceFilter === 'interviews' ? 'all' : 'interviews')}
+              >
+                <FileText size={16} color={sourceFilter === 'interviews' ? '#FFFFFF' : '#B45309'} className="mr-1" />
+                <Text>历史采访</Text>
+              </Button>
+              <Button
+                variant={sourceFilter === 'references' ? 'default' : 'outline'}
+                className={sourceFilter === 'references' ? 'bg-amber-700 text-white' : 'bg-white'}
+                onClick={() => setSourceFilter(sourceFilter === 'references' ? 'all' : 'references')}
+              >
+                <BookOpen size={16} color={sourceFilter === 'references' ? '#FFFFFF' : '#B45309'} className="mr-1" />
+                <Text>外部文献</Text>
+              </Button>
+            </View>
+          </CardContent>
+        </Card>
       </View>
 
       {/* 话题列表 */}
@@ -123,7 +174,16 @@ const TopicsPage = () => {
           </View>
         ) : (
           <View className="space-y-3">
-            {topics.map((topic) => (
+            {filteredTopics.length === 0 && (
+              <Card className="border-stone-100 bg-white">
+                <CardContent className="p-6">
+                  <Text className="block text-sm text-stone-500 text-center">
+                    没有找到匹配的话题
+                  </Text>
+                </CardContent>
+              </Card>
+            )}
+            {filteredTopics.map((topic) => (
               <Card
                 key={topic.id}
                 className="border-stone-100 shadow-sm"
@@ -143,6 +203,12 @@ const TopicsPage = () => {
                       <View className="flex items-center gap-2">
                         <Badge className="bg-amber-50 text-amber-700 border-amber-200">
                           <Text className="text-xs">{topic.subtopic_count} 个子话题</Text>
+                        </Badge>
+                        <Badge className="bg-green-50 text-green-700 border-green-100">
+                          <Text className="text-xs">{topic.interview_count || 0} 条采访</Text>
+                        </Badge>
+                        <Badge className="bg-blue-50 text-blue-700 border-blue-100">
+                          <Text className="text-xs">{topic.reference_count || 0} 篇文献</Text>
                         </Badge>
                         <Text className="block text-xs text-stone-400">
                           {new Date(topic.created_at).toLocaleDateString('zh-CN')}

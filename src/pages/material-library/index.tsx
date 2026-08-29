@@ -26,6 +26,7 @@ const SOURCE_LABEL: Record<string, string> = {
   manual: '手动录入',
   ai_search: 'AI 搜索',
   web: '网络采集',
+  interview: '历史采访沉淀',
 }
 
 const MaterialLibraryPage = () => {

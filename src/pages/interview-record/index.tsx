@@ -214,7 +214,9 @@ const InterviewRecordPage = () => {
       const data = res.data?.data
       if (data) {
         setResult(data)
+        setEditedTranscript(data.transcript || '')
         setConfirmStatus('pending')
+        setIsEditingTranscript(false)
         Taro.showToast({ title: '整理完成', icon: 'success' })
       }
     } catch (err) {
@@ -248,7 +250,9 @@ const InterviewRecordPage = () => {
       const resultData = data?.data
       if (resultData) {
         setResult(resultData)
+        setEditedTranscript(resultData.transcript || '')
         setConfirmStatus('pending')
+        setIsEditingTranscript(false)
         Taro.showToast({ title: '文档解析完成', icon: 'success' })
       }
     } catch (err) {
@@ -282,27 +286,42 @@ const InterviewRecordPage = () => {
 
   /** 确认记录归入资料库 */
   const handleConfirm = async () => {
+    const recordId = result?.record_id
+    if (!recordId) {
+      Taro.showToast({ title: '记录ID缺失，请重新转写', icon: 'none' })
+      return
+    }
     try {
+      setSaving(true)
       const res = await Network.request({
-        url: `/api/interview-records/${Date.now()}/confirm`,
+        url: `/api/interview-records/${recordId}/confirm`,
         method: 'POST',
+        data: {
+          edited_text: editedTranscript !== result?.transcript ? editedTranscript : undefined,
+        },
       })
       console.log('Confirm response:', res.data)
       setConfirmStatus('confirmed')
-      Taro.showToast({ title: '已确认归入资料库', icon: 'success' })
+      setIsEditingTranscript(false)
+      Taro.showToast({ title: '已确认并保存到资料库', icon: 'success' })
     } catch (err) {
       console.error('确认失败:', err)
-      // 即使接口失败也更新本地状态（recordId 需要从保存接口返回）
-      setConfirmStatus('confirmed')
-      Taro.showToast({ title: '已确认归入资料库', icon: 'success' })
+      Taro.showToast({ title: '确认失败，请重试', icon: 'none' })
+    } finally {
+      setSaving(false)
     }
   }
 
   /** 驳回记录 */
   const handleReject = async () => {
+    const recordId = result?.record_id
+    if (!recordId) {
+      Taro.showToast({ title: '记录ID缺失，请重新转写', icon: 'none' })
+      return
+    }
     try {
       const res = await Network.request({
-        url: `/api/interview-records/${Date.now()}/reject`,
+        url: `/api/interview-records/${recordId}/reject`,
         method: 'POST',
       })
       console.log('Reject response:', res.data)
@@ -310,8 +329,7 @@ const InterviewRecordPage = () => {
       Taro.showToast({ title: '已驳回', icon: 'none' })
     } catch (err) {
       console.error('驳回失败:', err)
-      setConfirmStatus('rejected')
-      Taro.showToast({ title: '已驳回', icon: 'none' })
+      Taro.showToast({ title: '驳回失败，请重试', icon: 'none' })
     }
   }
 
@@ -600,6 +618,71 @@ const InterviewRecordPage = () => {
             </View>
           </View>
 
+          {/* 转写文本确认/编辑区 */}
+          <Card className="border-stone-100 bg-white">
+            <CardContent className="p-4">
+              <View className="flex items-center justify-between mb-3">
+                <View className="flex items-center gap-2">
+                  <FileText size={16} color="#78716C" />
+                  <Text className="block text-sm font-semibold text-stone-800">转写原文</Text>
+                </View>
+                {confirmStatus === 'pending' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-amber-700"
+                    onClick={() => {
+                      if (isEditingTranscript) {
+                        // 保存编辑
+                        setIsEditingTranscript(false)
+                      } else {
+                        setIsEditingTranscript(true)
+                      }
+                    }}
+                  >
+                    {isEditingTranscript ? (
+                      <>
+                        <Check size={14} color="#B45309" className="mr-1" />
+                        <Text>完成编辑</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Pencil size={14} color="#B45309" className="mr-1" />
+                        <Text>编辑</Text>
+                      </>
+                    )}
+                  </Button>
+                )}
+              </View>
+
+              {isEditingTranscript ? (
+                <View className="bg-stone-50 rounded-xl p-3">
+                  <Textarea
+                    style={{ width: '100%', minHeight: '200px', backgroundColor: 'transparent' }}
+                    placeholder="编辑转写内容..."
+                    value={editedTranscript}
+                    onInput={(e) => setEditedTranscript(e.detail.value)}
+                    maxlength={10000}
+                  />
+                </View>
+              ) : (
+                <View className="bg-stone-50 rounded-xl p-3">
+                  <Text className="block text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">
+                    {editedTranscript || '（无转写内容）'}
+                  </Text>
+                </View>
+              )}
+
+              {editedTranscript !== result?.transcript && confirmStatus === 'pending' && (
+                <View className="mt-2">
+                  <Badge className="bg-amber-50 text-amber-600 border-amber-200">
+                    <Text className="text-xs">已修改</Text>
+                  </Badge>
+                </View>
+              )}
+            </CardContent>
+          </Card>
+
           {/* 确认操作栏 */}
           {confirmStatus && (
             <Card className="border-stone-100 bg-white">
@@ -652,9 +735,10 @@ const InterviewRecordPage = () => {
                         size="sm"
                         className="bg-green-600 text-white"
                         onClick={handleConfirm}
+                        disabled={saving}
                       >
                         <CircleCheck size={14} color="#fff" className="mr-1" />
-                        <Text>确认入库</Text>
+                        <Text>{saving ? '保存中...' : '确认入库'}</Text>
                       </Button>
                     </View>
                   )}

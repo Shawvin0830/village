@@ -50,6 +50,16 @@ export class TopicsController {
     return { code: 200, msg: 'success', data };
   }
 
+  @Get(':id/subtopics/:subId/materials')
+  @HttpCode(200)
+  async getSubtopicMaterials(
+    @Param('id') id: string,
+    @Param('subId') subId: string,
+  ) {
+    const data = await this.topicsService.getSubtopicMaterials(id, subId);
+    return { code: 200, msg: 'success', data };
+  }
+
   @Post(':id/subtopics/:subId/auth')
   @HttpCode(200)
   async updateAuth(

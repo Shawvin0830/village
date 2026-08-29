@@ -2,6 +2,80 @@ import { Injectable } from '@nestjs/common';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { AuthorizationManagerSkill } from '@/skills/authorization-manager.skill';
 
+type TopicAffiliation = {
+  primary: string;
+  secondary: string;
+};
+
+type AnalysisSegment = {
+  summary?: string;
+  source_text?: string;
+  quote?: string;
+  mandarin_text?: string;
+  dialect_original?: string;
+  speaker?: string;
+  interviewee?: string;
+};
+
+type InterviewRecord = {
+  id: string;
+  created_at?: string | null;
+  mandarin_text?: string | null;
+  dialect_original?: string | null;
+  transcript_text?: string | null;
+  ai_analysis?: Record<string, unknown> | null;
+};
+
+const trimText = (value?: string | null) => (value || '').trim();
+
+const shortText = (value?: string | null, limit = 120) => {
+  const text = trimText(value).replace(/\s+/g, ' ');
+  return text.length > limit ? `${text.slice(0, limit)}...` : text;
+};
+
+const getRecordText = (record: InterviewRecord) =>
+  trimText(record.mandarin_text) || trimText(record.dialect_original) || trimText(record.transcript_text);
+
+const extractSegments = (record: InterviewRecord): AnalysisSegment[] => {
+  const analysis = record.ai_analysis;
+  if (!analysis || !Array.isArray(analysis.segments)) return [];
+  return analysis.segments as AnalysisSegment[];
+};
+
+const extractPersonBase = (record: InterviewRecord) => {
+  const analysis = record.ai_analysis || {};
+  const interviewee = analysis.interviewee as Record<string, unknown> | undefined;
+  if (interviewee && typeof interviewee === 'object') {
+    return {
+      name: String(interviewee.name || '受访人待补充'),
+      age: interviewee.age ? String(interviewee.age) : null,
+      occupation: interviewee.occupation ? String(interviewee.occupation) : null,
+      role: interviewee.role || interviewee.identity ? String(interviewee.role || interviewee.identity) : null,
+    };
+  }
+
+  const segment = extractSegments(record).find((item) => item.interviewee || item.speaker);
+  return {
+    name: String(analysis.interviewee_name || analysis.speaker || analysis.person || segment?.interviewee || segment?.speaker || '受访人待补充'),
+    age: analysis.age ? String(analysis.age) : null,
+    occupation: analysis.occupation ? String(analysis.occupation) : null,
+    role: analysis.role || analysis.identity ? String(analysis.role || analysis.identity) : null,
+  };
+};
+
+const safeAffiliations = (value: unknown): TopicAffiliation[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      const record = item as Record<string, unknown>;
+      return {
+        primary: String(record.primary || ''),
+        secondary: String(record.secondary || ''),
+      };
+    })
+    .filter((item) => item.primary && item.secondary);
+};
+
 @Injectable()
 export class TopicsService {
   private get client() {
@@ -17,33 +91,34 @@ export class TopicsService {
       .order('created_at', { ascending: false });
     if (error) throw new Error(`查询话题列表失败: ${error.message}`);
 
-    const topicsWithDetails = await Promise.all(
+    const topicsWithCount = await Promise.all(
       (data || []).map(async (topic) => {
-        const { data: subtopics, count } = await this.client
+        const { count } = await this.client
           .from('subtopics')
-          .select('id, name, icon, transcript_status, verify_status, auth_level', { count: 'exact' })
+          .select('*', { count: 'exact', head: true })
+          .eq('topic_id', topic.id);
+
+        const { count: interviewCount } = await this.client
+          .from('interview_records')
+          .select('*', { count: 'exact', head: true })
           .eq('topic_id', topic.id)
-          .order('created_at', { ascending: true });
-        
-        // 检查是否有采访策划
-        const { data: plans } = await this.client
-          .from('interview_plans')
-          .select('id')
-          .eq('topic_id', topic.id)
-          .limit(1);
-        
-        const hasPlan = plans && plans.length > 0;
-        
-        return { 
-          ...topic, 
+          .eq('status', 'completed');
+
+        const { count: referenceCount } = await this.client
+          .from('reference_materials')
+          .select('*', { count: 'exact', head: true })
+          .eq('topic_id', topic.id);
+
+        return {
+          ...topic,
           subtopic_count: count || 0,
-          subtopics: subtopics || [],
-          has_interview_plan: hasPlan,
+          interview_count: interviewCount || 0,
+          reference_count: referenceCount || 0,
         };
       }),
     );
 
-    return topicsWithDetails;
+    return topicsWithCount;
   }
 
   async findOne(id: string) {
@@ -93,6 +168,99 @@ export class TopicsService {
       .single();
     if (error) throw new Error(`创建子话题失败: ${error.message}`);
     return data;
+  }
+
+  async getSubtopicMaterials(topicId: string, subtopicId: string) {
+    const { data: topic, error: topicError } = await this.client
+      .from('topics')
+      .select('id, name')
+      .eq('id', topicId)
+      .maybeSingle();
+    if (topicError) throw new Error(`查询话题失败: ${topicError.message}`);
+    if (!topic) throw new Error('话题不存在');
+
+    const { data: subtopic, error: subtopicError } = await this.client
+      .from('subtopics')
+      .select('id, name, icon, summary, transcript_status, verify_status')
+      .eq('id', subtopicId)
+      .eq('topic_id', topicId)
+      .maybeSingle();
+    if (subtopicError) throw new Error(`查询子话题失败: ${subtopicError.message}`);
+    if (!subtopic) throw new Error('子话题不存在');
+
+    const { data: records, error: recordsError } = await this.client
+      .from('interview_records')
+      .select('id, created_at, mandarin_text, dialect_original, transcript_text, ai_analysis')
+      .eq('topic_id', topicId)
+      .eq('subtopic_id', subtopicId)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false });
+    if (recordsError) throw new Error(`查询历史采访失败: ${recordsError.message}`);
+
+    const { data: people } = await this.client
+      .from('interviewees')
+      .select('id, name, age, occupation, role, auth_status, auth_note, topic_affiliations, confirmed_at')
+      .eq('topic_id', topicId);
+
+    const peopleByName = new Map<string, Record<string, unknown>>();
+    for (const person of people || []) {
+      peopleByName.set(String(person.name), person);
+    }
+
+    const quotes = ((records || []) as InterviewRecord[]).map((record, index) => {
+      const segments = extractSegments(record);
+      const text = getRecordText(record);
+      const firstSegment = segments[0];
+      const base = extractPersonBase(record);
+      const savedPerson = peopleByName.get(base.name);
+      const quoteText =
+        shortText(firstSegment?.quote || firstSegment?.source_text || firstSegment?.mandarin_text || firstSegment?.summary || text, 160) ||
+        '暂无摘录';
+
+      return {
+        id: record.id,
+        quote: quoteText,
+        summary: shortText(firstSegment?.summary || text, 120),
+        full_interview: text || '暂无完整采访整理文本',
+        created_at: record.created_at || null,
+        interviewee: {
+          id: savedPerson?.id || `temp-${index}-${record.id}`,
+          name: String(savedPerson?.name || base.name),
+          age: savedPerson?.age || base.age,
+          occupation: savedPerson?.occupation || base.occupation,
+          role: savedPerson?.role || base.role,
+          auth_status: savedPerson?.auth_status || 'unset',
+          auth_note: savedPerson?.auth_note || null,
+          topic_affiliations: safeAffiliations(savedPerson?.topic_affiliations),
+          confirmed_at: savedPerson?.confirmed_at || null,
+        },
+      };
+    });
+
+    const { data: references, error: referencesError } = await this.client
+      .from('reference_materials')
+      .select('id, title, content, source, url, tags, created_at')
+      .eq('topic_id', topicId)
+      .eq('subtopic_id', subtopicId)
+      .order('created_at', { ascending: false });
+    if (referencesError) throw new Error(`查询外部文献失败: ${referencesError.message}`);
+
+    return {
+      topic_id: topic.id,
+      topic_name: topic.name,
+      subtopic,
+      quotes,
+      references: (references || []).map((item) => ({
+        id: item.id,
+        title: item.title,
+        source: item.source,
+        url: item.url,
+        tags: item.tags || [],
+        summary: shortText(item.content, 160),
+        content: item.content,
+        created_at: item.created_at,
+      })),
+    };
   }
 
   async deleteSubtopic(topicId: string, subtopicId: string) {
