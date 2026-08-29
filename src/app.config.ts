@@ -7,6 +7,7 @@ export default defineAppConfig({
     'pages/interview-plan/index',
     'pages/interview-record/index',
     'pages/authorization/index',
+    'pages/material-library/index',
   ],
   window: {
     backgroundTextStyle: 'light',

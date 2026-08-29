@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Network } from '@/network'
-import { Plus, BookOpen, Mic, ShieldCheck, Trash2 } from 'lucide-react-taro'
+import { Plus, BookOpen, Mic, ShieldCheck, Trash2, Library } from 'lucide-react-taro'
 
 interface Subtopic {
   id: string
@@ -144,13 +144,21 @@ const TopicDetailPage = () => {
 
       {/* 快捷操作 */}
       <View className="px-4 mb-4">
-        <View className="grid grid-cols-3 gap-3">
+        <View className="grid grid-cols-4 gap-3">
+          <Button
+            variant="outline"
+            className="flex flex-col items-center gap-1 h-auto py-3 border-stone-200 bg-white"
+            onClick={() => Taro.navigateTo({ url: `/pages/material-library/index?topicId=${topicId}&topicName=${encodeURIComponent(topic.name)}` })}
+          >
+            <Library size={20} color="#B45309" />
+            <Text className="text-xs text-stone-700">资料库</Text>
+          </Button>
           <Button
             variant="outline"
             className="flex flex-col items-center gap-1 h-auto py-3 border-stone-200 bg-white"
             onClick={() => Taro.navigateTo({ url: `/pages/interview-plan/index?topicId=${topicId}` })}
           >
-            <BookOpen size={20} color="#B45309" />
+            <BookOpen size={20} color="#92400E" />
             <Text className="text-xs text-stone-700">采访策划</Text>
           </Button>
           <Button
