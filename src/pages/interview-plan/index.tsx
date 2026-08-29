@@ -490,13 +490,15 @@ const InterviewPlanPage = () => {
               <Text className="block text-sm text-stone-500 mb-6 text-center">
                 AI 会根据话题背景和资料库，生成大人版和孩子版的采访问题
               </Text>
-              <Button
-                className="bg-amber-700 hover:bg-amber-800 text-white"
-                onClick={handleGenerate}
-                disabled={generating}
-              >
-                <Text>{generating ? 'AI 正在思考...' : '生成采访问题'}</Text>
-              </Button>
+              <View style={{ width: '100%' }}>
+                <Button
+                  className="w-full bg-amber-700 text-white"
+                  onClick={handleGenerate}
+                  disabled={generating}
+                >
+                  <Text className="text-white">{generating ? 'AI 正在思考...' : '生成采访问题'}</Text>
+                </Button>
+              </View>
             </CardContent>
           </Card>
         </View>
