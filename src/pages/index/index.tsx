@@ -331,7 +331,7 @@ const IndexPage = () => {
               </View>
 
               {/* 快捷操作按钮 */}
-              <View className="grid grid-cols-5 gap-2 mt-4 pt-4 border-t border-stone-100">
+              <View className="grid grid-cols-4 gap-2 mt-4 pt-4 border-t border-stone-100">
                 <Button
                   variant="ghost"
                   className="flex flex-col items-center gap-1 h-auto py-2"
@@ -362,15 +362,7 @@ const IndexPage = () => {
                   onClick={() => goToInterviewRecord(selectedTopic.id)}
                 >
                   <Mic size={18} color="#B45309" />
-                  <Text className="text-xs text-stone-600">采访</Text>
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="flex flex-col items-center gap-1 h-auto py-2"
-                  onClick={() => goToTopicDetail(selectedTopic.id)}
-                >
-                  <FileText size={18} color="#B45309" />
-                  <Text className="text-xs text-stone-600">详情</Text>
+                  <Text className="text-xs text-stone-600">采后整理</Text>
                 </Button>
               </View>
             </CardContent>
