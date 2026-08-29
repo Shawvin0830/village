@@ -1,4 +1,4 @@
-import { View, Text } from '@tarojs/components'
+import { View, Text, type ITouchEvent } from '@tarojs/components'
 import { useState, useCallback } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Card, CardContent } from '@/components/ui/card'
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Network } from '@/network'
-import { Plus, ChevronRight, Search, FileText, BookOpen } from 'lucide-react-taro'
+import { Plus, ChevronRight, Search, FileText, BookOpen, Trash2 } from 'lucide-react-taro'
 
 interface Topic {
   id: string
@@ -31,6 +31,7 @@ const TopicsPage = () => {
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
   const [creating, setCreating] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
 
@@ -84,6 +85,35 @@ const TopicsPage = () => {
 
   const goToDetail = (topicId: string) => {
     Taro.navigateTo({ url: `/pages/topic-detail/index?id=${topicId}` })
+  }
+
+  const handleDeleteTopic = async (
+    topic: Topic,
+    event?: ITouchEvent,
+  ) => {
+    event?.stopPropagation?.()
+    const modal = await Taro.showModal({
+      title: '确认删除话题',
+      content: `删除「${topic.name}」后，这个话题下的子话题、采访材料和文献关联也会一起删除。确定删除吗？`,
+      confirmText: '删除',
+      confirmColor: '#DC2626',
+    })
+    if (!modal.confirm) return
+
+    try {
+      setDeletingId(topic.id)
+      await Network.request({
+        url: `/api/topics/${topic.id}`,
+        method: 'DELETE',
+      })
+      Taro.showToast({ title: '已删除', icon: 'success' })
+      fetchTopics()
+    } catch (err) {
+      console.error('删除话题失败:', err)
+      Taro.showToast({ title: '删除失败', icon: 'none' })
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const filteredTopics = topics.filter((topic) => {
@@ -215,7 +245,18 @@ const TopicsPage = () => {
                         </Text>
                       </View>
                     </View>
-                    <ChevronRight size={20} color="#A8A29E" />
+                    <View className="flex items-center ml-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-stone-400 mr-1"
+                        disabled={deletingId === topic.id}
+                        onClick={(event) => handleDeleteTopic(topic, event)}
+                      >
+                        <Trash2 size={16} color="#DC2626" />
+                      </Button>
+                      <ChevronRight size={20} color="#A8A29E" />
+                    </View>
                   </View>
                 </CardContent>
               </Card>

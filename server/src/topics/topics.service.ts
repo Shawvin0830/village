@@ -91,13 +91,12 @@ export class TopicsService {
       .order('created_at', { ascending: false });
     if (error) throw new Error(`查询话题列表失败: ${error.message}`);
 
-    const topicsWithDetails = await Promise.all(
+    const topicsWithCount = await Promise.all(
       (data || []).map(async (topic) => {
-        const { data: subtopics, count } = await this.client
+        const { count } = await this.client
           .from('subtopics')
-          .select('id, name, icon, transcript_status, verify_status, auth_level', { count: 'exact' })
-          .eq('topic_id', topic.id)
-          .order('created_at', { ascending: true });
+          .select('*', { count: 'exact', head: true })
+          .eq('topic_id', topic.id);
 
         const { count: interviewCount } = await this.client
           .from('interview_records')
@@ -110,25 +109,16 @@ export class TopicsService {
           .select('*', { count: 'exact', head: true })
           .eq('topic_id', topic.id);
 
-        // 检查是否有采访策划
-        const { data: plans } = await this.client
-          .from('interview_plans')
-          .select('id')
-          .eq('topic_id', topic.id)
-          .limit(1);
-
         return {
           ...topic,
           subtopic_count: count || 0,
           interview_count: interviewCount || 0,
           reference_count: referenceCount || 0,
-          subtopics: subtopics || [],
-          has_interview_plan: plans && plans.length > 0,
         };
       }),
     );
 
-    return topicsWithDetails;
+    return topicsWithCount;
   }
 
   async findOne(id: string) {
@@ -147,13 +137,7 @@ export class TopicsService {
       .order('created_at', { ascending: true });
     if (subError) throw new Error(`查询子话题失败: ${subError.message}`);
 
-    // 检查是否存在采访策划
-    const { count: planCount } = await this.client
-      .from('interview_plans')
-      .select('*', { count: 'exact', head: true })
-      .eq('topic_id', id);
-
-    return { ...topic, subtopics: subtopics || [], has_interview_plan: (planCount || 0) > 0 };
+    return { ...topic, subtopics: subtopics || [] };
   }
 
   async create(name: string, description?: string) {
@@ -164,6 +148,15 @@ export class TopicsService {
       .single();
     if (error) throw new Error(`创建话题失败: ${error.message}`);
     return data;
+  }
+
+  async deleteTopic(id: string) {
+    const { error } = await this.client
+      .from('topics')
+      .delete()
+      .eq('id', id);
+    if (error) throw new Error(`删除话题失败: ${error.message}`);
+    return { success: true };
   }
 
   async getSubtopics(topicId: string) {

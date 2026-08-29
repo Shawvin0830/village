@@ -33,6 +33,13 @@ export class TopicsController {
     return { code: 200, msg: 'success', data };
   }
 
+  @Delete(':id')
+  @HttpCode(200)
+  async deleteTopic(@Param('id') id: string) {
+    const data = await this.topicsService.deleteTopic(id);
+    return { code: 200, msg: 'success', data };
+  }
+
   @Get(':id/subtopics')
   @HttpCode(200)
   async getSubtopics(@Param('id') id: string) {
