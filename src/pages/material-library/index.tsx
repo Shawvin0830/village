@@ -253,7 +253,11 @@ export default function VillageStoriesPage() {
 
                     {/* 故事列表 */}
                     {group.stories.map((story) => (
-                      <Card key={story.id} className="mb-2 ml-3">
+                      <Card
+                        key={story.id}
+                        className="mb-2 ml-3"
+                        onClick={() => handleViewStory(story.id)}
+                      >
                         <CardContent className="p-4">
                           <View className="flex items-start justify-between gap-3">
                             <View className="flex-1">
@@ -284,14 +288,20 @@ export default function VillageStoriesPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleViewStory(story.id)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleViewStory(story.id)
+                              }}
                             >
                               <Text>阅读全文</Text>
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleViewMaterials(story.topic_id)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleViewMaterials(story.topic_id)
+                              }}
                             >
                               <Text>查看素材</Text>
                             </Button>
@@ -356,18 +366,39 @@ export default function VillageStoriesPage() {
                                       )}
                                     </View>
                                   </View>
-                                  <Button
-                                    size="sm"
-                                    disabled={!hasMaterials || generating}
-                                    onClick={() =>
-                                      handleGenerateStory(item.topic_id, item.subtopic_id || undefined)
-                                    }
-                                  >
-                                    <Sparkles size={14} color="#fff" />
-                                    <Text className="ml-1">
-                                      {item.has_story ? '重新生成' : '生成故事'}
-                                    </Text>
-                                  </Button>
+                                  {item.has_story ? (
+                                    <View className="flex gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleViewStory(item.story_id!)}
+                                      >
+                                        <Text>查看故事</Text>
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={!hasMaterials || generating}
+                                        onClick={() =>
+                                          handleGenerateStory(item.topic_id, item.subtopic_id || undefined)
+                                        }
+                                      >
+                                        <Sparkles size={14} color="#666" />
+                                        <Text className="ml-1">重新生成</Text>
+                                      </Button>
+                                    </View>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      disabled={!hasMaterials || generating}
+                                      onClick={() =>
+                                        handleGenerateStory(item.topic_id, item.subtopic_id || undefined)
+                                      }
+                                    >
+                                      <Sparkles size={14} color="#fff" />
+                                      <Text className="ml-1">生成故事</Text>
+                                    </Button>
+                                  )}
                                 </View>
                               </CardContent>
                             </Card>
