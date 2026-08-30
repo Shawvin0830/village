@@ -39,15 +39,18 @@ export class StoriesController {
   }
 
   /**
-   * 为话题生成故事
+   * 为话题/子话题生成故事
    */
   @Post('generate')
   @HttpCode(200)
-  async generate(@Body() body: { topicId: string }) {
+  async generate(@Body() body: { topicId: string; subtopicId?: string }) {
     if (!body.topicId?.trim()) {
       return { code: 400, msg: '话题ID不能为空', data: null }
     }
-    const story = await this.storiesService.generateStoryForTopic(body.topicId.trim())
+    const story = await this.storiesService.generateStoryForTopic(
+      body.topicId.trim(),
+      body.subtopicId?.trim(),
+    )
     if (!story) {
       return { code: 404, msg: '话题不存在或该话题下没有可用素材', data: null }
     }
