@@ -1,5 +1,5 @@
 import { View, Text, ScrollView } from '@tarojs/components'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -56,6 +56,11 @@ const VillageStoriesPage = () => {
   useDidShow(() => {
     fetchStories()
   })
+
+  // H5 端 useDidShow 可能不会在首次加载时触发，用 useEffect 兜底
+  useEffect(() => {
+    fetchStories()
+  }, [fetchStories])
 
   const fetchStoriableTopics = useCallback(async () => {
     try {
