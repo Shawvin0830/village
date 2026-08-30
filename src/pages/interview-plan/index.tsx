@@ -50,16 +50,6 @@ interface Subtopic {
   summary?: string
 }
 
-interface Material {
-  id: string
-  source: string
-  title: string
-  content: string
-  tags: string[] | null
-  url: string | null
-  created_at: string
-}
-
 interface StructuredData {
   summary: string
   keyFacts: string[]
@@ -98,8 +88,8 @@ const InterviewPlanPage = () => {
   const [planVersions, setPlanVersions] = useState<InterviewPlan[]>([])
   const [showVersionHistory, setShowVersionHistory] = useState(false)
 
-  // 资料库状态（仅用于显示数量）
-  const [materials, setMaterials] = useState<Material[]>([])
+  // 子话题素材数量
+  const [subtopicMaterialCounts, setSubtopicMaterialCounts] = useState<Record<string, number>>({})
   const [materialsLoading, setMaterialsLoading] = useState(false)
 
   // AI 搜索状态
@@ -144,10 +134,9 @@ const InterviewPlanPage = () => {
   const [supplementRequirements, setSupplementRequirements] = useState('')
   const [supplementing, setSupplementing] = useState(false)
 
-  // 加载话题名称、资料列表、已有策划和子话题
+  // 加载话题名称、已有策划和子话题
   useEffect(() => {
     if (topicId) {
-      loadMaterials()
       loadTopicName()
       loadPlans()
       loadSubtopics()
@@ -193,30 +182,34 @@ const InterviewPlanPage = () => {
 
   const loadSubtopics = async () => {
     try {
+      setMaterialsLoading(true)
       const res = await Network.request({ url: `/api/topics/${topicId}/subtopics` })
       const data = res.data?.data
       if (data && Array.isArray(data)) {
         setSubtopics(data)
+        // 加载每个子话题的素材数量
+        const counts: Record<string, number> = {}
+        await Promise.all(
+          data.map(async (sub: Subtopic) => {
+            try {
+              const matRes = await Network.request({
+                url: `/api/topics/${topicId}/subtopics/${sub.id}/materials`,
+              })
+              const matData = matRes.data?.data
+              if (matData) {
+                const quoteCount = matData.quotes?.length || 0
+                const refCount = matData.references?.length || 0
+                counts[sub.id] = quoteCount + refCount
+              }
+            } catch {
+              counts[sub.id] = 0
+            }
+          })
+        )
+        setSubtopicMaterialCounts(counts)
       }
     } catch (err) {
       console.error('获取子话题失败:', err)
-    }
-  }
-
-  const loadMaterials = async () => {
-    try {
-      setMaterialsLoading(true)
-      const res = await Network.request({
-        url: `/api/materials/topic/${topicId}`,
-        method: 'GET',
-      })
-      console.log('Load materials response:', res.data)
-      const data = res.data?.data
-      if (data) {
-        setMaterials(data)
-      }
-    } catch (err) {
-      console.error('加载资料失败:', err)
     } finally {
       setMaterialsLoading(false)
     }
@@ -267,7 +260,7 @@ const InterviewPlanPage = () => {
       console.log('Save material response:', res.data)
       if (res.data?.code === 200) {
         Taro.showToast({ title: '已保存到资料库', icon: 'success' })
-        loadMaterials()
+        loadSubtopics()
       }
     } catch (err) {
       console.error('保存资料失败:', err)
@@ -315,7 +308,7 @@ const InterviewPlanPage = () => {
       console.log('Save research response:', res.data)
       if (res.data?.code === 200) {
         Taro.showToast({ title: '已保存到资料库', icon: 'success' })
-        loadMaterials()
+        loadSubtopics()
       } else {
         Taro.showToast({ title: res.data?.msg || '保存失败', icon: 'none' })
       }
@@ -538,13 +531,6 @@ const InterviewPlanPage = () => {
     setShowVersionHistory(false)
   }
 
-  // 跳转到资料库管理页
-  const goToMaterialLibrary = () => {
-    Taro.navigateTo({
-      url: `/pages/material-library/index?topicId=${topicId}&topicName=${encodeURIComponent(topicName || '资料库')}`,
-    })
-  }
-
   return (
     <View className="min-h-screen bg-stone-50 pb-8">
       {/* 头部 */}
@@ -572,29 +558,59 @@ const InterviewPlanPage = () => {
         </View>
       )}
 
-      {/* 资料库 - 紧凑入口 */}
+      {/* 资料库 - 按子话题分类 */}
       <View className="px-4 mb-4">
-        <Card className="border-stone-100 bg-white" onClick={goToMaterialLibrary}>
-          <CardContent className="p-4 flex items-center justify-between">
-            <View className="flex items-center gap-2">
-              <FolderOpen size={18} color="#B45309" />
-              <Text className="block text-base font-semibold text-stone-800">
-                资料库
+        <View className="flex items-center gap-2 mb-3">
+          <FolderOpen size={18} color="#B45309" />
+          <Text className="block text-base font-semibold text-stone-800">资料库</Text>
+          {materialsLoading ? (
+            <Skeleton className="h-5 w-8" />
+          ) : (
+            <Badge className="bg-stone-100 text-stone-600 text-xs">
+              {subtopics.length} 个子话题
+            </Badge>
+          )}
+        </View>
+        {subtopics.length === 0 ? (
+          <Card className="border-stone-100 bg-white">
+            <CardContent className="p-4">
+              <Text className="block text-sm text-stone-400 text-center">
+                暂无子话题，请先在话题详情中创建子话题
               </Text>
-              {materialsLoading ? (
-                <Skeleton className="h-5 w-8" />
-              ) : (
-                <Badge className="bg-stone-100 text-stone-600 text-xs">
-                  {materials.length}
-                </Badge>
-              )}
-            </View>
-            <View className="flex items-center gap-1">
-              <Text className="block text-xs text-stone-400">进入管理</Text>
-              <ChevronRight size={16} color="#9CA3AF" />
-            </View>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : (
+          <View className="space-y-2">
+            {subtopics.map((sub) => (
+              <Card
+                key={sub.id}
+                className="border-stone-100 bg-white"
+                onClick={() => {
+                  Taro.navigateTo({
+                    url: `/pages/subtopic-materials/index?topicId=${topicId}&subtopicId=${sub.id}`,
+                  })
+                }}
+              >
+                <CardContent className="p-3 flex items-center justify-between">
+                  <View className="flex items-center gap-2 flex-1">
+                    <Text className="block text-sm text-lg">{sub.icon || '📌'}</Text>
+                    <View className="flex-1">
+                      <Text className="block text-sm font-medium text-stone-700">
+                        {sub.name}
+                      </Text>
+                    </View>
+                  </View>
+                  <View className="flex items-center gap-1">
+                    <Badge className="bg-amber-50 text-amber-700 text-xs">
+                      {subtopicMaterialCounts[sub.id] || 0} 条素材
+                    </Badge>
+                    <ChevronRight size={14} color="#9CA3AF" />
+                  </View>
+                </CardContent>
+              </Card>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* AI 资料搜索（含专题研究能力） */}
