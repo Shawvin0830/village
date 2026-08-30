@@ -898,74 +898,29 @@ const InterviewPlanPage = () => {
         </Card>
       </View>
 
-      {/* 继续调整 / 生成采访稿 区域（放在建议问题上面） */}
-      {!loading && (
+      {/* 生成采访稿入口（未生成时显示） */}
+      {!loading && !plan && (
         <View className="px-4 mb-4">
           <Card className="border-stone-200 bg-white">
             <CardContent className="p-4">
-              {plan ? (
-                <>
-                  {/* 已有策划：显示继续调整 */}
-                  <View className="flex items-center gap-2 mb-3">
-                    <MessageCircle size={18} color="#B45309" />
-                    <Text className="block text-base font-semibold text-stone-800">
-                      继续调整
-                    </Text>
-                  </View>
-                  <Text className="block text-xs text-stone-500 mb-3">
-                    告诉 AI 你想怎么改，比如「孩子版问题太学术了」、「再加一个关于XX的问题」
-                  </Text>
-                  <View className="bg-stone-50 rounded-lg p-3 mb-3">
-                    <Textarea
-                      style={{ width: '100%', minHeight: '80px', backgroundColor: 'transparent' }}
-                      placeholder="输入你的修改意见..."
-                      value={feedback}
-                      onInput={(e) => setFeedback(e.detail.value)}
-                    />
-                  </View>
-                  <View className="flex gap-2">
-                    <Button
-                      className="flex-1 bg-amber-700 hover:bg-amber-800 text-white"
-                      onClick={handleRefine}
-                      disabled={refining || !feedback.trim()}
-                    >
-                      <Send size={14} color="#fff" className="mr-1" />
-                      <Text className="text-xs">{refining ? 'AI 正在调整...' : '发送反馈'}</Text>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="border-stone-200"
-                      onClick={handleGenerate}
-                      disabled={generating}
-                    >
-                      <RefreshCw size={14} color="#B45309" className="mr-1" />
-                      <Text className="text-xs">{generating ? '重新生成中...' : '生成采访稿'}</Text>
-                    </Button>
-                  </View>
-                </>
-              ) : (
-                <>
-                  {/* 未生成策划：显示生成采访稿入口 */}
-                  <View className="flex flex-col items-center py-2">
-                    <Text className="block text-4xl mb-4">📋</Text>
-                    <Text className="block text-base text-stone-700 mb-2 text-center">
-                      准备好采访问题
-                    </Text>
-                    <Text className="block text-sm text-stone-500 mb-6 text-center">
-                      AI 会根据话题背景和资料库，生成大人版和孩子版的采访问题
-                    </Text>
-                    <View style={{ width: '100%' }}>
-                      <Button
-                        className="w-full bg-amber-700 text-white"
-                        onClick={handleGenerate}
-                        disabled={generating}
-                      >
-                        <Text className="text-white">{generating ? 'AI 正在思考...' : '生成采访稿'}</Text>
-                      </Button>
-                    </View>
-                  </View>
-                </>
-              )}
+              <View className="flex flex-col items-center py-2">
+                <Text className="block text-4xl mb-4">📋</Text>
+                <Text className="block text-base text-stone-700 mb-2 text-center">
+                  准备好采访问题
+                </Text>
+                <Text className="block text-sm text-stone-500 mb-6 text-center">
+                  AI 会根据话题背景和资料库，生成大人版和孩子版的采访问题
+                </Text>
+                <View style={{ width: '100%' }}>
+                  <Button
+                    className="w-full bg-amber-700 text-white"
+                    onClick={handleGenerate}
+                    disabled={generating}
+                  >
+                    <Text className="text-white">{generating ? 'AI 正在思考...' : '生成采访稿'}</Text>
+                  </Button>
+                </View>
+              </View>
             </CardContent>
           </Card>
         </View>
@@ -1221,6 +1176,48 @@ const InterviewPlanPage = () => {
                   </View>
                 </View>
               )}
+            </CardContent>
+          </Card>
+
+          {/* 调整优化 */}
+          <Card className="border-stone-200 bg-white">
+            <CardContent className="p-4">
+              <View className="flex items-center gap-2 mb-3">
+                <MessageCircle size={18} color="#B45309" />
+                <Text className="block text-base font-semibold text-stone-800">
+                  调整优化
+                </Text>
+              </View>
+              <Text className="block text-xs text-stone-500 mb-3">
+                告诉 AI 你想怎么改，比如「孩子版问题太学术了」、「再加一个关于XX的问题」
+              </Text>
+              <View className="bg-stone-50 rounded-lg p-3 mb-3">
+                <Textarea
+                  style={{ width: '100%', minHeight: '80px', backgroundColor: 'transparent' }}
+                  placeholder="输入你的修改意见..."
+                  value={feedback}
+                  onInput={(e) => setFeedback(e.detail.value)}
+                />
+              </View>
+              <View className="flex gap-2">
+                <Button
+                  className="flex-1 bg-amber-700 hover:bg-amber-800 text-white"
+                  onClick={handleRefine}
+                  disabled={refining || !feedback.trim()}
+                >
+                  <Send size={14} color="#fff" className="mr-1" />
+                  <Text className="text-xs">{refining ? 'AI 正在调整...' : '发送反馈'}</Text>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-stone-200"
+                  onClick={handleGenerate}
+                  disabled={generating}
+                >
+                  <RefreshCw size={14} color="#B45309" className="mr-1" />
+                  <Text className="text-xs">{generating ? '重新生成中...' : '重新生成'}</Text>
+                </Button>
+              </View>
             </CardContent>
           </Card>
         </View>
