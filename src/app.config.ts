@@ -39,7 +39,7 @@ export default defineAppConfig({
       },
       {
         pagePath: 'pages/material-library/index',
-        text: '资料库',
+        text: '村庄故事',
         iconPath: './assets/tabbar/book-open.png',
         selectedIconPath: './assets/tabbar/book-open-active.png',
       },

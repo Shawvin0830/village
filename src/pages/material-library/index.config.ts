@@ -1,3 +1,3 @@
 export default typeof definePageConfig === 'function'
-  ? definePageConfig({ navigationBarTitleText: '资料库' })
-  : { navigationBarTitleText: '资料库' }
+  ? definePageConfig({ navigationBarTitleText: '村庄故事' })
+  : { navigationBarTitleText: '村庄故事' }
