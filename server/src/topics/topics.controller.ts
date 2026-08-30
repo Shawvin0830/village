@@ -40,6 +40,13 @@ export class TopicsController {
     return { code: 200, msg: 'success', data };
   }
 
+  @Put(':id/complete')
+  @HttpCode(200)
+  async updateCompletion(@Param('id') id: string, @Body() body: { isCompleted: boolean }) {
+    const data = await this.topicsService.updateCompletion(id, body.isCompleted);
+    return { code: 200, msg: 'success', data };
+  }
+
   @Get(':id/subtopics')
   @HttpCode(200)
   async getSubtopics(@Param('id') id: string) {

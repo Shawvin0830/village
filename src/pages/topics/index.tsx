@@ -57,24 +57,30 @@ const TopicsPage = () => {
   })
 
   const handleCreate = async () => {
+    console.log('handleCreate called, newName:', newName, 'newDesc:', newDesc)
     if (!newName.trim()) {
+      console.log('newName is empty, showing toast')
       Taro.showToast({ title: '请输入话题名称', icon: 'none' })
       return
     }
     try {
       setCreating(true)
+      console.log('Sending POST /api/topics, name:', newName.trim())
       const res = await Network.request({
         url: '/api/topics',
         method: 'POST',
         data: { name: newName.trim(), description: newDesc.trim() || undefined },
       })
-      console.log('Create topic response:', res.data)
+      console.log('Create topic response:', JSON.stringify(res.data))
       if (res.data?.data) {
         Taro.showToast({ title: '创建成功', icon: 'success' })
         setShowCreate(false)
         setNewName('')
         setNewDesc('')
         fetchTopics()
+      } else {
+        console.log('Response has no data field:', res.data)
+        Taro.showToast({ title: '创建失败：返回数据异常', icon: 'none' })
       }
     } catch (err) {
       console.error('创建话题失败:', err)

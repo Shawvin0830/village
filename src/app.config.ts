@@ -27,7 +27,7 @@ export default defineAppConfig({
     list: [
       {
         pagePath: 'pages/index/index',
-        text: '进度看板',
+        text: '话题进度',
         iconPath: './assets/tabbar/home.png',
         selectedIconPath: './assets/tabbar/home-active.png',
       },

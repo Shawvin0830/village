@@ -87,7 +87,7 @@ export class TopicsService {
   async findAll() {
     const { data, error } = await this.client
       .from('topics')
-      .select('id, name, description, status, created_at')
+      .select('id, name, description, status, is_completed, created_at')
       .order('created_at', { ascending: false });
     if (error) throw new Error(`查询话题列表失败: ${error.message}`);
 
@@ -126,13 +126,22 @@ export class TopicsService {
           .eq('topic_id', topic.id)
           .eq('status', 'completed');
 
+        // 是否有村庄故事
+        const { data: stories } = await this.client
+          .from('village_stories')
+          .select('id')
+          .eq('topic_id', topic.id)
+          .limit(1);
+
         return {
           ...topic,
+          is_completed: (topic as Record<string, unknown>).is_completed || false,
           subtopic_count: subtopicCount || 0,
           has_interview_plan: plans && plans.length > 0,
           authorized_count: authorizedCount || 0,
           interview_count: interviewCount || 0,
           organized_count: organizedCount || 0,
+          has_story: stories && stories.length > 0,
         };
       }),
     );
@@ -176,6 +185,17 @@ export class TopicsService {
       .eq('id', id);
     if (error) throw new Error(`删除话题失败: ${error.message}`);
     return { success: true };
+  }
+
+  async updateCompletion(id: string, isCompleted: boolean) {
+    const { data, error } = await this.client
+      .from('topics')
+      .update({ is_completed: isCompleted, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw new Error(`更新完成状态失败: ${error.message}`);
+    return data;
   }
 
   async getSubtopics(topicId: string) {
