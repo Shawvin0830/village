@@ -4,7 +4,8 @@ import Taro, { useDidShow } from '@tarojs/taro'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { BookOpen, RefreshCw, FileText, Sparkles } from 'lucide-react-taro'
+import { Separator } from '@/components/ui/separator'
+import { BookOpen, RefreshCw, FileText, Sparkles, ChevronLeft, ArrowRight } from 'lucide-react-taro'
 import { Network } from '@/network'
 
 /** 故事列表项 */
@@ -172,24 +173,26 @@ export default function VillageStoriesPage() {
   if (selectedStory) {
     return (
       <View className="min-h-screen bg-stone-50">
-        <View className="bg-white px-4 pt-12 pb-4 shadow-sm">
-          <View className="flex items-center justify-between">
+        {/* 顶部导航栏 */}
+        <View className="bg-white px-4 pt-12 pb-4 shadow-sm sticky top-0 z-10">
+          <View className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={() => setSelectedStory(null)}>
-              <Text>返回</Text>
+              <ChevronLeft size={20} color="#666" />
             </Button>
             <Text className="block text-lg font-semibold text-stone-800">故事详情</Text>
-            <View className="w-12" />
           </View>
         </View>
 
-        <ScrollView scrollY className="h-[calc(100vh-120px)] px-4 py-4">
-          <Card className="mb-4">
+        {/* 故事内容 - 使用普通 View 让页面自然滚动 */}
+        <View className="px-4 py-4 pb-20">
+          {/* 故事标题卡片 */}
+          <Card className="mb-4 shadow-sm">
             <CardContent className="p-5">
-              <Text className="block text-xl font-bold text-stone-800 mb-2">
+              <Text className="block text-xl font-bold text-stone-800 mb-2 leading-tight">
                 {selectedStory.title}
               </Text>
               {selectedStory.summary && (
-                <Text className="block text-sm text-stone-500 mb-3">
+                <Text className="block text-sm text-stone-500 mb-3 leading-relaxed">
                   {selectedStory.summary}
                 </Text>
               )}
@@ -197,18 +200,28 @@ export default function VillageStoriesPage() {
                 <Badge variant="secondary">
                   <Text>{selectedStory.source_material_count} 个素材</Text>
                 </Badge>
+                <Badge variant="outline">
+                  <Text>{new Date(selectedStory.created_at).toLocaleDateString()}</Text>
+                </Badge>
               </View>
             </CardContent>
           </Card>
 
-          <Card>
+          <Separator className="my-4" />
+
+          {/* 故事正文 */}
+          <Card className="shadow-sm">
             <CardContent className="p-5">
-              <Text className="block text-base text-stone-700 leading-relaxed whitespace-pre-wrap">
+              <View className="flex items-center gap-2 mb-4">
+                <BookOpen size={18} color="#d97706" />
+                <Text className="block text-base font-semibold text-stone-700">阅读全文</Text>
+              </View>
+              <Text className="block text-base text-stone-700 leading-loose whitespace-pre-wrap">
                 {selectedStory.content}
               </Text>
             </CardContent>
           </Card>
-        </ScrollView>
+        </View>
       </View>
     )
   }
@@ -218,73 +231,88 @@ export default function VillageStoriesPage() {
       {/* 顶部标题 */}
       <View className="bg-white px-4 pt-12 pb-4 shadow-sm">
         <View className="flex items-center justify-between">
-          <Text className="block text-xl font-bold text-stone-800">村庄故事</Text>
+          <View className="flex items-center gap-2">
+            <BookOpen size={22} color="#d97706" />
+            <Text className="block text-xl font-bold text-stone-800">村庄故事</Text>
+          </View>
           <Button variant="ghost" size="sm" onClick={loadData} disabled={loading}>
-            <RefreshCw size={16} color={loading ? '#999' : '#666'} />
+            <RefreshCw size={18} color={loading ? '#999' : '#666'} />
           </Button>
         </View>
-        <Text className="block text-sm text-stone-500 mt-1">
+        <Text className="block text-sm text-stone-500 mt-2">
           基于采访素材和文献资料，生成可读性强的村庄历史故事
         </Text>
       </View>
 
-      <ScrollView scrollY className="h-[calc(100vh-120px)] px-4 py-4">
+      <ScrollView scrollY className="h-[calc(100vh-140px)] px-4 py-4">
         {loading ? (
           <View className="flex items-center justify-center py-20">
             <Text className="block text-stone-400">加载中...</Text>
           </View>
         ) : (
           <>
-            {/* 按主话题分组展示故事 */}
+            {/* 已生成的故事 */}
             {groupedStories.length > 0 && (
               <View className="mb-6">
-                <Text className="block text-base font-semibold text-stone-700 mb-3">
-                  已生成的故事
-                </Text>
+                <View className="flex items-center gap-2 mb-3">
+                  <View className="w-1 h-5 bg-amber-500 rounded-full" />
+                  <Text className="block text-base font-semibold text-stone-700">
+                    已生成的故事
+                  </Text>
+                  <Badge variant="secondary">
+                    <Text>{stories.length}</Text>
+                  </Badge>
+                </View>
+
                 {groupedStories.map((group) => (
                   <View key={group.topic_id} className="mb-4">
                     {/* 主话题标题 */}
-                    <View className="flex items-center gap-2 mb-2">
-                      <View className="w-1 h-4 bg-amber-500 rounded-full" />
-                      <Text className="block text-sm font-medium text-stone-600">
+                    <View className="flex items-center gap-2 mb-2 ml-1">
+                      <Text className="block text-sm font-medium text-stone-500">
                         {group.topic_name}
                       </Text>
                     </View>
 
-                    {/* 故事列表 */}
+                    {/* 故事卡片 */}
                     {group.stories.map((story) => (
                       <Card
                         key={story.id}
-                        className="mb-2 ml-3"
+                        className="mb-3 ml-2 shadow-sm active:opacity-80"
                         onClick={() => handleViewStory(story.id)}
                       >
                         <CardContent className="p-4">
                           <View className="flex items-start justify-between gap-3">
                             <View className="flex-1">
-                              <View className="flex items-center gap-2 mb-1">
-                                <BookOpen size={16} color="#d97706" />
+                              <View className="flex items-center gap-2 mb-2">
+                                <Sparkles size={16} color="#d97706" />
                                 <Text className="block text-base font-semibold text-stone-800">
                                   {story.title}
                                 </Text>
                               </View>
                               {story.subtopic_name && (
-                                <Text className="block text-xs text-stone-500 mb-1">
-                                  子话题：{story.subtopic_name}
-                                </Text>
+                                <View className="flex items-center gap-1 mb-2">
+                                  <Badge variant="outline">
+                                    <Text className="text-xs">{story.subtopic_name}</Text>
+                                  </Badge>
+                                </View>
                               )}
                               {story.summary && (
-                                <Text className="block text-sm text-stone-500 mb-2">
+                                <Text className="block text-sm text-stone-500 mb-3 leading-relaxed line-clamp-2">
                                   {story.summary}
                                 </Text>
                               )}
                               <View className="flex items-center gap-2">
                                 <Badge variant="secondary">
-                                  <Text>{story.source_material_count} 个素材</Text>
+                                  <Text className="text-xs">{story.source_material_count} 个素材</Text>
                                 </Badge>
                               </View>
                             </View>
+                            <ArrowRight size={18} color="#999" />
                           </View>
-                          <View className="flex gap-2 mt-3">
+
+                          <Separator className="my-3" />
+
+                          <View className="flex gap-2">
                             <Button
                               variant="outline"
                               size="sm"
@@ -293,7 +321,8 @@ export default function VillageStoriesPage() {
                                 handleViewStory(story.id)
                               }}
                             >
-                              <Text>阅读全文</Text>
+                              <BookOpen size={14} color="#d97706" />
+                              <Text className="ml-1">阅读全文</Text>
                             </Button>
                             <Button
                               variant="ghost"
@@ -314,13 +343,17 @@ export default function VillageStoriesPage() {
               </View>
             )}
 
-            {/* 可生成故事的话题列表（主话题→子话题层级） */}
+            {/* 可生成故事的话题列表 */}
             <View>
-              <Text className="block text-base font-semibold text-stone-700 mb-3">
-                可生成故事的话题
-              </Text>
+              <View className="flex items-center gap-2 mb-3">
+                <View className="w-1 h-5 bg-stone-400 rounded-full" />
+                <Text className="block text-base font-semibold text-stone-700">
+                  可生成故事的话题
+                </Text>
+              </View>
+
               {groupedTopics.length === 0 ? (
-                <Card>
+                <Card className="shadow-sm">
                   <CardContent className="p-8 flex flex-col items-center">
                     <FileText size={48} color="#d4d4d9" />
                     <Text className="block text-stone-400 mt-3 text-center">
@@ -334,21 +367,20 @@ export default function VillageStoriesPage() {
                   return (
                     <View key={mainTopic.topic_id} className="mb-4">
                       {/* 主话题标题 */}
-                      <View className="flex items-center gap-2 mb-2">
-                        <View className="w-1 h-4 bg-amber-500 rounded-full" />
-                        <Text className="block text-sm font-medium text-stone-600">
+                      <View className="flex items-center gap-2 mb-2 ml-1">
+                        <Text className="block text-sm font-medium text-stone-500">
                           {mainTopic.topic_name}
                         </Text>
                       </View>
 
-                      {/* 主话题和子话题列表 */}
-                      <View className="ml-3">
+                      {/* 话题列表 */}
+                      <View className="ml-2">
                         {topicGroup.map((item) => {
                           const displayName = item.subtopic_name || '（主话题整体）'
                           const hasMaterials = item.material_count > 0
 
                           return (
-                            <Card key={item.subtopic_id || item.topic_id} className="mb-2">
+                            <Card key={item.subtopic_id || item.topic_id} className="mb-2 shadow-sm">
                               <CardContent className="p-3">
                                 <View className="flex items-center justify-between gap-3">
                                   <View className="flex-1">
@@ -357,11 +389,11 @@ export default function VillageStoriesPage() {
                                     </Text>
                                     <View className="flex items-center gap-2 mt-1">
                                       <Badge variant="secondary">
-                                        <Text>{item.material_count} 个素材</Text>
+                                        <Text className="text-xs">{item.material_count} 个素材</Text>
                                       </Badge>
                                       {item.has_story && (
-                                        <Badge>
-                                          <Text>已有故事</Text>
+                                        <Badge variant="outline">
+                                          <Text className="text-xs">已有故事</Text>
                                         </Badge>
                                       )}
                                     </View>
@@ -373,7 +405,7 @@ export default function VillageStoriesPage() {
                                         size="sm"
                                         onClick={() => handleViewStory(item.story_id!)}
                                       >
-                                        <Text>查看故事</Text>
+                                        <Text>查看</Text>
                                       </Button>
                                       <Button
                                         variant="ghost"
@@ -396,7 +428,7 @@ export default function VillageStoriesPage() {
                                       }
                                     >
                                       <Sparkles size={14} color="#fff" />
-                                      <Text className="ml-1">生成故事</Text>
+                                      <Text className="ml-1">生成</Text>
                                     </Button>
                                   )}
                                 </View>
